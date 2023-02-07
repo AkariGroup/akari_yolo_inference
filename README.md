@@ -1,0 +1,2 @@
+# akari_yolo_inference
+AKARIでYOLOの推論を行うレポジトリ
