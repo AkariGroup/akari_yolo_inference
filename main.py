@@ -50,7 +50,8 @@ labels = nnMappings.get("labels", {})
 nnPath = args.model
 if not Path(nnPath).exists():
     print("No blob found at {}. Looking into DepthAI model zoo.".format(nnPath))
-    nnPath = str(blobconverter.from_zoo(args.model, shaves = 6, zoo_type = "depthai", use_cache=True))
+    nnPath = str(blobconverter.from_zoo(
+        args.model, shaves=6, zoo_type="depthai", use_cache=True))
 # sync outputs
 syncNN = True
 
@@ -72,16 +73,16 @@ camRgb.setPreviewKeepAspectRatio(False)
 camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
 camRgb.setInterleaved(False)
 camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
-camRgb.setIspScale(1,2)
+camRgb.setPreviewSize(1920, 1080)
 camRgb.setFps(30)
 
 xoutIsp = pipeline.create(dai.node.XLinkOut)
 xoutIsp.setStreamName("isp")
 camRgb.isp.link(xoutIsp.input)
 
-# Use ImageMqnip to resize to 300x300 with letterboxing
+# Use ImageMqnip to resize to 640x640 with letterboxing
 manip = pipeline.create(dai.node.ImageManip)
-manip.setMaxOutputFrameSize(W * H * 3) # 640x640x3
+manip.setMaxOutputFrameSize(W * H * 3)  # 640x640x3
 manip.initialConfig.setResizeThumbnail(W, H)
 camRgb.preview.link(manip.inputImage)
 
@@ -97,7 +98,7 @@ detectionNetwork.setNumInferenceThreads(2)
 detectionNetwork.input.setBlocking(False)
 
 # Linking
-#camRgb.preview.link(detectionNetwork.input)
+# camRgb.preview.link(detectionNetwork.input)
 manip.out.link(detectionNetwork.input)
 detectionNetwork.passthrough.link(xoutRgb.input)
 detectionNetwork.out.link(nnOut.input)
@@ -125,20 +126,30 @@ with dai.Device(pipeline) as device:
     def displayFrame(name, frame, detections):
         color = (255, 0, 0)
         for detection in detections:
-            bbox = frameNorm(frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
-            cv2.putText(frame, labels[detection.label], (bbox[0] + 10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-            cv2.putText(frame, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
+            bbox = frameNorm(
+                frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
+            cv2.putText(frame, labels[detection.label], (bbox[0] +
+                        10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(frame, f"{int(detection.confidence * 100)}%",
+                        (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.rectangle(frame, (bbox[0], bbox[1]),
+                          (bbox[2], bbox[3]), color, 2)
+        # Resize the frame to crop mergin
+        width = frame.shape[1]
+        height = frame.shape[1] * 9 / 16
+        brank_height = width - height
+        frame = frame[int(brank_height / 2): int(frame.shape[0] -
+                      brank_height / 2), 0:width]
         # Show the frame
         cv2.imshow(name, frame)
 
     while True:
-        #inRgb = qRgb.get()
+        inRgb = qRgb.get()
         inIsp = qIsp.get()
         inDet = qDet.get()
 
         if inIsp is not None:
-            frame = inIsp.getCvFrame()
+            frame = inRgb.getCvFrame()
             cv2.putText(frame, "NN fps: {:.2f}".format(counter / (time.monotonic() - startTime)),
                         (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color2)
 
