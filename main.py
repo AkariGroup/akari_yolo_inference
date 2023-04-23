@@ -148,7 +148,7 @@ with dai.Device(pipeline) as device:
         inIsp = qIsp.get()
         inDet = qDet.get()
 
-        if inIsp is not None:
+        if inRgb is not None:
             frame = inRgb.getCvFrame()
             cv2.putText(frame, "NN fps: {:.2f}".format(counter / (time.monotonic() - startTime)),
                         (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color2)
