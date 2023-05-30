@@ -133,11 +133,14 @@ with dai.Device(pipeline) as device:
         brank_height = width - height
         frame = frame[int(brank_height / 2): int(frame.shape[0] -
                       brank_height / 2), 0:width]
-        frame = cv2.resize(frame, (int(width * DISPLAY_WINDOW_SIZE_RATE), int(height * DISPLAY_WINDOW_SIZE_RATE)))
+        frame = cv2.resize(frame, (int(
+            width * DISPLAY_WINDOW_SIZE_RATE), int(height * DISPLAY_WINDOW_SIZE_RATE)))
         for detection in detections:
             # Fix ymin and ymax to cropped frame pos
-            detection.ymin = ((width / height) * detection.ymin - (brank_height / 2 / height))
-            detection.ymax =  ((width / height) * detection.ymax - (brank_height / 2 / height))
+            detection.ymin = ((width / height) *
+                              detection.ymin - (brank_height / 2 / height))
+            detection.ymax = ((width / height) *
+                              detection.ymax - (brank_height / 2 / height))
             bbox = frameNorm(
                 frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
             cv2.putText(frame, labels[detection.label], (bbox[0] +
