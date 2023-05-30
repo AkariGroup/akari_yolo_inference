@@ -128,7 +128,6 @@ with dai.Device(pipeline) as device:
     def displayFrame(name, frame, detections):
         color = (255, 0, 0)
         # Crop the frame Square to 16:9
-        center = frame.shape
         width = frame.shape[1]
         height = frame.shape[1] * 9 / 16
         brank_height = width - height
