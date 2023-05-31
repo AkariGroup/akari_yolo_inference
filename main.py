@@ -10,6 +10,8 @@ import argparse
 import json
 import blobconverter
 
+DISPLAY_WINDOW_SIZE_RATE = 2.0
+
 # parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", help="Provide model name or model path for inference",
@@ -125,7 +127,20 @@ with dai.Device(pipeline) as device:
 
     def displayFrame(name, frame, detections):
         color = (255, 0, 0)
+        # Crop the frame Square to 16:9
+        width = frame.shape[1]
+        height = frame.shape[1] * 9 / 16
+        brank_height = width - height
+        frame = frame[int(brank_height / 2): int(frame.shape[0] -
+                      brank_height / 2), 0:width]
+        frame = cv2.resize(frame, (int(
+            width * DISPLAY_WINDOW_SIZE_RATE), int(height * DISPLAY_WINDOW_SIZE_RATE)))
         for detection in detections:
+            # Fix ymin and ymax to cropped frame pos
+            detection.ymin = ((width / height) *
+                              detection.ymin - (brank_height / 2 / height))
+            detection.ymax = ((width / height) *
+                              detection.ymax - (brank_height / 2 / height))
             bbox = frameNorm(
                 frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
             cv2.putText(frame, labels[detection.label], (bbox[0] +
@@ -134,12 +149,6 @@ with dai.Device(pipeline) as device:
                         (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
             cv2.rectangle(frame, (bbox[0], bbox[1]),
                           (bbox[2], bbox[3]), color, 2)
-        # Resize the frame to crop mergin
-        width = frame.shape[1]
-        height = frame.shape[1] * 9 / 16
-        brank_height = width - height
-        frame = frame[int(brank_height / 2): int(frame.shape[0] -
-                      brank_height / 2), 0:width]
         # Show the frame
         cv2.imshow(name, frame)
 
