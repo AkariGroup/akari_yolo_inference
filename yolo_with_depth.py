@@ -51,7 +51,7 @@ class HostSync:
 
 
 def create_bird_frame():
-    fov = 68.3
+    fov = 72.9
     frame = np.zeros((300, 100, 3), np.uint8)
     cv2.rectangle(frame, (0, 283),
                   (frame.shape[1], frame.shape[0]), (70, 70, 70), -1)
@@ -159,6 +159,7 @@ camRgb.setPreviewSize(W, H)
 camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
 camRgb.setInterleaved(False)
 camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
+camRgb.setFps(10)
 
 
 monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_480_P)
@@ -172,6 +173,8 @@ stereo.setLeftRightCheck(True)
 stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
 monoLeft.out.link(stereo.left)
 monoRight.out.link(stereo.right)
+monoRight.setFps(10)
+monoLeft.setFps(10)
 
 spatialDetectionNetwork.setBlobPath(nnPath)
 spatialDetectionNetwork.setConfidenceThreshold(confidenceThreshold)
@@ -267,7 +270,6 @@ with dai.Device(pipeline) as device:
                                 detection.spatialCoordinates.z)
 
         if display is not None:
-
             # Birdseye view
             cv2.imshow("birds", birds)
             cv2.imshow("yolo", cv2.resize(display, (960, 540)))
