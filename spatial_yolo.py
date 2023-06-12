@@ -25,9 +25,9 @@ class TextHelper:
 
     def putText(self, frame, text, coords):
         cv2.putText(frame, text, coords, self.text_type,
-                    0.6, self.bg_color, 3, self.line_type)
+                    1, self.bg_color, 3, self.line_type)
         cv2.putText(frame, text, coords, self.text_type,
-                    0.6, self.color, 1, self.line_type)
+                    1, self.color, 1, self.line_type)
 
     def rectangle(self, frame, p1, p2, id):
         cv2.rectangle(frame, p1, p2, (0, 0, 0), 4)
@@ -295,20 +295,20 @@ def main() -> None:
                         label = detection.label
                     text.putText(display, str(label), (x2 + 10, y1 + 20))
                     text.putText(display, "{:.0f}%".format(
-                        detection.confidence * 100), (x2 + 10, y1 + 40))
+                        detection.confidence * 100), (x2 + 10, y1 + 50))
                     text.rectangle(display, (x1, y1),
                                    (x2, y2), detection.label)
                     if detection.spatialCoordinates.z != 0:
                         text.putText(display, "X: {:.2f} m".format(
-                            detection.spatialCoordinates.x / 1000), (x2 + 10, y1 + 60))
+                            detection.spatialCoordinates.x / 1000), (x2 + 10, y1 + 80))
                         text.putText(display, "Y: {:.2f} m".format(
-                            detection.spatialCoordinates.y / 1000), (x2 + 10, y1 + 80))
+                            detection.spatialCoordinates.y / 1000), (x2 + 10, y1 + 110))
                         text.putText(display, "Z: {:.2f} m".format(
-                            detection.spatialCoordinates.z / 1000), (x2 + 10, y1 + 100))
+                            detection.spatialCoordinates.z / 1000), (x2 + 10, y1 + 140))
                     draw_bird_frame(birds, detection.spatialCoordinates.x,
                                     detection.spatialCoordinates.z, detection.label)
                 cv2.putText(display, "NN fps: {:.2f}".format(counter / (time.monotonic() - startTime)),
-                        (2, display.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 1, (255, 255, 255))
+                            (2, display.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 1, (255, 255, 255))
 
             if display is not None:
                 # Birdseye view
