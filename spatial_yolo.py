@@ -8,11 +8,14 @@ import numpy as np
 import argparse
 import json
 import blobconverter
+import time
 
 
 MAX_Z = 15000
 DISPLAY_WINDOW_SIZE_RATE = 3.0
 idColors = np.random.random(size=(256, 3)) * 256
+
+
 class TextHelper:
     def __init__(self) -> None:
         self.bg_color = (0, 0, 0)
@@ -80,13 +83,14 @@ def draw_bird_frame(frame, x, z, id=None):
     pointY = frame.shape[0] - int(z / (MAX_Z - 10000) * frame.shape[0]) - 20
     pointX = int(-x / max_x * frame.shape[1] + frame.shape[1] / 2)
     if id is not None:
-        #cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
+        # cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
         #           cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0))
         cv2.circle(frame, (pointX, pointY), 2, idColors[id],
-                    thickness=5, lineType=8, shift=0)
+                   thickness=5, lineType=8, shift=0)
     else:
         cv2.circle(frame, (pointX, pointY), 2, (0, 255, 0),
-            thickness=5, lineType=8, shift=0)
+                   thickness=5, lineType=8, shift=0)
+
 
 def frameNorm(frame, bbox):
     normVals = np.full(len(bbox), frame.shape[0])
@@ -234,6 +238,8 @@ def main() -> None:
         text = TextHelper()
         sync = HostSync()
         display = None
+        startTime = time.monotonic()
+        counter = 0
 
         while True:
             if previewQueue.has():
@@ -244,6 +250,7 @@ def main() -> None:
                 manipQueue.get()
             if detectionNNQueue.has():
                 sync.add_msg("detections", detectionNNQueue.get())
+                counter += 1
 
             msgs = sync.get_msgs()
             if msgs is not None:
@@ -298,9 +305,10 @@ def main() -> None:
                             detection.spatialCoordinates.y / 1000), (x2 + 10, y1 + 80))
                         text.putText(display, "Z: {:.2f} m".format(
                             detection.spatialCoordinates.z / 1000), (x2 + 10, y1 + 100))
-
                     draw_bird_frame(birds, detection.spatialCoordinates.x,
                                     detection.spatialCoordinates.z, detection.label)
+                cv2.putText(display, "NN fps: {:.2f}".format(counter / (time.monotonic() - startTime)),
+                        (2, display.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 1, (255, 255, 255))
 
             if display is not None:
                 # Birdseye view

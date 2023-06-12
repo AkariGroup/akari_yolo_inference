@@ -18,6 +18,8 @@ parser.add_argument("-m", "--model", help="Provide model name or model path for 
                     default='yolov4_tiny_coco_416x416', type=str)
 parser.add_argument("-c", "--config", help="Provide config path for inference",
                     default='json/yolov4-tiny.json', type=str)
+parser.add_argument("-f", "--fps", help="Camera frame fps. This should be smaller than nn inference fps",
+                        default=10, type=int)
 args = parser.parse_args()
 
 # parse config
@@ -76,7 +78,7 @@ camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
 camRgb.setInterleaved(False)
 camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
 camRgb.setPreviewSize(1920, 1080)
-camRgb.setFps(10)
+camRgb.setFps(args.fps)
 
 xoutIsp = pipeline.create(dai.node.XLinkOut)
 xoutIsp.setStreamName("isp")
