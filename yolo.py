@@ -1,25 +1,40 @@
 #!/usr/bin/env python3
 
+import argparse
+import json
+import time
 from pathlib import Path
-import sys
+
+import blobconverter
 import cv2
 import depthai as dai
 import numpy as np
-import time
-import argparse
-import json
-import blobconverter
 
 DISPLAY_WINDOW_SIZE_RATE = 2.0
 
 # parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("-m", "--model", help="Provide model name or model path for inference",
-                    default='yolov4_tiny_coco_416x416', type=str)
-parser.add_argument("-c", "--config", help="Provide config path for inference",
-                    default='json/yolov4-tiny.json', type=str)
-parser.add_argument("-f", "--fps", help="Camera frame fps. This should be smaller than nn inference fps",
-                        default=10, type=int)
+parser.add_argument(
+    "-m",
+    "--model",
+    help="Provide model name or model path for inference",
+    default="yolov4_tiny_coco_416x416",
+    type=str,
+)
+parser.add_argument(
+    "-c",
+    "--config",
+    help="Provide config path for inference",
+    default="json/yolov4-tiny.json",
+    type=str,
+)
+parser.add_argument(
+    "-f",
+    "--fps",
+    help="Camera frame fps. This should be smaller than nn inference fps",
+    default=10,
+    type=int,
+)
 args = parser.parse_args()
 
 # parse config
@@ -33,7 +48,7 @@ nnConfig = config.get("nn_config", {})
 
 # parse input shape
 if "input_size" in nnConfig:
-    W, H = tuple(map(int, nnConfig.get("input_size").split('x')))
+    W, H = tuple(map(int, nnConfig.get("input_size").split("x")))
 
 # extract metadata
 metadata = nnConfig.get("NN_specific_metadata", {})
@@ -54,10 +69,9 @@ labels = nnMappings.get("labels", {})
 nnPath = args.model
 if not Path(nnPath).exists():
     print("No blob found at {}. Looking into DepthAI model zoo.".format(nnPath))
-    nnPath = str(blobconverter.from_zoo(
-        args.model, shaves=6, zoo_type="depthai", use_cache=True))
-# sync outputs
-syncNN = True
+    nnPath = str(
+        blobconverter.from_zoo(args.model, shaves=6, zoo_type="depthai", use_cache=True)
+    )
 
 # Create pipeline
 pipeline = dai.Pipeline()
@@ -112,7 +126,7 @@ with dai.Device(pipeline) as device:
 
     # Output queues will be used to get the rgb frames and nn data from the outputs defined above
     qRgb = device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
-    qIsp = device.getOutputQueue(name='isp')
+    qIsp = device.getOutputQueue(name="isp")
     qDet = device.getOutputQueue(name="nn", maxSize=4, blocking=False)
 
     frame = None
@@ -133,26 +147,52 @@ with dai.Device(pipeline) as device:
         width = frame.shape[1]
         height = frame.shape[1] * 9 / 16
         brank_height = width - height
-        frame = frame[int(brank_height / 2): int(frame.shape[0] -
-                      brank_height / 2), 0:width]
-        frame = cv2.resize(frame, (int(
-            width * DISPLAY_WINDOW_SIZE_RATE), int(height * DISPLAY_WINDOW_SIZE_RATE)))
+        frame = frame[
+            int(brank_height / 2) : int(frame.shape[0] - brank_height / 2), 0:width
+        ]
+        frame = cv2.resize(
+            frame,
+            (
+                int(width * DISPLAY_WINDOW_SIZE_RATE),
+                int(height * DISPLAY_WINDOW_SIZE_RATE),
+            ),
+        )
         for detection in detections:
             # Fix ymin and ymax to cropped frame pos
-            detection.ymin = ((width / height) *
-                              detection.ymin - (brank_height / 2 / height))
-            detection.ymax = ((width / height) *
-                              detection.ymax - (brank_height / 2 / height))
+            detection.ymin = (width / height) * detection.ymin - (
+                brank_height / 2 / height
+            )
+            detection.ymax = (width / height) * detection.ymax - (
+                brank_height / 2 / height
+            )
             bbox = frameNorm(
-                frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
-            cv2.putText(frame, labels[detection.label], (bbox[0] +
-                        10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-            cv2.putText(frame, f"{int(detection.confidence * 100)}%",
-                        (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-            cv2.rectangle(frame, (bbox[0], bbox[1]),
-                          (bbox[2], bbox[3]), color, 2)
-        cv2.putText(frame, "NN fps: {:.2f}".format(counter / (time.monotonic() - startTime)),
-                    (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color2)
+                frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax)
+            )
+            cv2.putText(
+                frame,
+                labels[detection.label],
+                (bbox[0] + 10, bbox[1] + 20),
+                cv2.FONT_HERSHEY_TRIPLEX,
+                0.5,
+                255,
+            )
+            cv2.putText(
+                frame,
+                f"{int(detection.confidence * 100)}%",
+                (bbox[0] + 10, bbox[1] + 40),
+                cv2.FONT_HERSHEY_TRIPLEX,
+                0.5,
+                255,
+            )
+            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
+        cv2.putText(
+            frame,
+            "NN fps: {:.2f}".format(counter / (time.monotonic() - startTime)),
+            (2, frame.shape[0] - 4),
+            cv2.FONT_HERSHEY_TRIPLEX,
+            0.4,
+            color2,
+        )
         # Show the frame
         cv2.imshow(name, frame)
 
@@ -163,8 +203,14 @@ with dai.Device(pipeline) as device:
 
         if inRgb is not None:
             frame = inRgb.getCvFrame()
-            cv2.putText(frame, "NN fps: {:.2f}".format(counter / (time.monotonic() - startTime)),
-                        (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color2)
+            cv2.putText(
+                frame,
+                "NN fps: {:.2f}".format(counter / (time.monotonic() - startTime)),
+                (2, frame.shape[0] - 4),
+                cv2.FONT_HERSHEY_TRIPLEX,
+                0.4,
+                color2,
+            )
 
         if inDet is not None:
             detections = inDet.detections
@@ -173,5 +219,5 @@ with dai.Device(pipeline) as device:
         if frame is not None:
             displayFrame("rgb", frame, detections)
 
-        if cv2.waitKey(1) == ord('q'):
+        if cv2.waitKey(1) == ord("q"):
             break
