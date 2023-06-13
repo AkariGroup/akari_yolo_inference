@@ -130,6 +130,12 @@ def main() -> None:
         help="Camera frame fps. This should be smaller than nn inference fps",
         default=10,
         type=int,
+    )    
+    parser.add_argument(
+        "-d",
+        "--display_camera",
+        help="Display camera rgb and depth frame",
+        action='store_true'
     )
     args = parser.parse_args()
 
@@ -280,6 +286,9 @@ def main() -> None:
                 )
                 depthFrameColor = cv2.equalizeHist(depthFrameColor)
                 depthFrameColor = cv2.applyColorMap(depthFrameColor, jet_custom)
+                if(args.display_camera):
+                    cv2.imshow("rgb", cv2.resize(frame, (640, 640)))
+                    cv2.imshow("depth", cv2.resize(depthFrameColor, (640, 480)))
                 # Crop the frame Square to 16:9
                 height = frame.shape[1] * 9 / 16
                 width = frame.shape[1]
