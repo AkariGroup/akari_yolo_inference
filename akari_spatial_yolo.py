@@ -79,23 +79,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # parse config
-    configPath = Path(args.config)
-    if not configPath.exists():
-        raise ValueError("Path {} does not exist!".format(configPath))
-
-    # get model path
-    nnPath = args.model
-    if not Path(nnPath).exists():
-        print("No blob found at {}. Looking into DepthAI model zoo.".format(nnPath))
-        nnPath = str(
-            blobconverter.from_zoo(
-                args.model, shaves=6, zoo_type="depthai", use_cache=True
-            )
-        )
-
     oakd_spatial_yolo = OakdSpatialYolo(
-        configPath, nnPath, args.fps, fov, args.display_camera
+        args.config, args.model, args.fps, fov, args.display_camera
     )
     frame = None
     detections = []
@@ -110,10 +95,10 @@ def main() -> None:
                 converted_pos = convert_to_pos_from_akari(
                     detection.spatialCoordinates, -1 * pitch, -1 * yaw
                 )
-                detection.spatialCoordinates.x = converted_pos[0]
-                detection.spatialCoordinates.y = converted_pos[1]
-                detection.spatialCoordinates.z = converted_pos[2]
-                oakd_spatial_yolo.display_frame("nn", frame, detections)
+                detection.spatialCoordinates.x = converted_pos[0][0]
+                detection.spatialCoordinates.y = converted_pos[1][0]
+                detection.spatialCoordinates.z = converted_pos[2][0]
+            oakd_spatial_yolo.display_frame("nn", frame, detections)
         if cv2.waitKey(1) == ord("q"):
             break
 

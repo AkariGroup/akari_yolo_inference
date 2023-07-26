@@ -13,10 +13,6 @@ import cv2
 import depthai as dai
 import numpy as np
 
-BLACK = (255, 255, 255)
-GREEN = (0, 255, 0)
-BLUE = (255, 0, 0)
-YELLOW = (0, 255, 255)
 DISPLAY_WINDOW_SIZE_RATE = 2.0
 MAX_Z = 15000
 idColors = np.random.random(size=(256, 3)) * 256
@@ -31,10 +27,10 @@ class TextHelper:
 
     def putText(self, frame, text, coords):
         cv2.putText(
-            frame, text, coords, self.text_type, 1, self.bg_color, 3, self.line_type
+            frame, text, coords, self.text_type, 0.8, self.bg_color, 3, self.line_type
         )
         cv2.putText(
-            frame, text, coords, self.text_type, 1, self.color, 1, self.line_type
+            frame, text, coords, self.text_type, 0.8, self.color, 1, self.line_type
         )
 
     def rectangle(self, frame, p1, p2, id):
@@ -67,23 +63,18 @@ class HostSync:
 class OakdSpatialYolo:
     def __init__(
         self,
-        configPath: str,
-        modelPath: str,
+        config_path: str,
+        model_path: str,
         fps: int,
         fov: float,
         cam_debug: bool = False,
     ) -> None:
-        if not Path(configPath).exists():
-            raise ValueError("Path {} does not poetry exist!".format(configPath))
-        with Path(configPath).open() as f:
+        if not Path(config_path).exists():
+            raise ValueError("Path {} does not poetry exist!".format(config_path))
+        with Path(config_path).open() as f:
             config = json.load(f)
         nnConfig = config.get("nn_config", {})
 
-        # parse input shape
-        if "input_size" in nnConfig:
-            self.width, self.height = tuple(
-                map(int, nnConfig.get("input_size").split("x"))
-            )
         # parse input shape
         if "input_size" in nnConfig:
             self.width, self.height = tuple(
@@ -109,17 +100,17 @@ class OakdSpatialYolo:
         nnMappings = config.get("mappings", {})
         self.labels = nnMappings.get("labels", {})
 
-        self.nnPath = Path(modelPath)
+        self.nn_path = Path(model_path)
         # get model path
-        if not self.nnPath.exists():
+        if not self.nn_path.exists():
             print(
                 "No blob found at {}. Looking into DepthAI model zoo.".format(
-                    self.nnPath
+                    self.nn_path
                 )
             )
-            self.nnPath = str(
+            self.nn_path = str(
                 blobconverter.from_zoo(
-                    modelPath, shaves=6, zoo_type="depthai", use_cache=True
+                    model_path, shaves=6, zoo_type="depthai", use_cache=True
                 )
             )
         self.fps = fps
@@ -129,9 +120,7 @@ class OakdSpatialYolo:
         self._pipeline = self._create_pipeline()
         self._device = self._stack.enter_context(dai.Device(self._pipeline))
         # Output queues will be used to get the rgb frames and nn data from the outputs defined above
-        self.qControl = self._device.getInputQueue("control")
         self.qRgb = self._device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
-        self.qIsp = self._device.getOutputQueue(name="isp")
         self.qDet = self._device.getOutputQueue(name="nn", maxSize=4, blocking=False)
         self.qDepth = self._device.getOutputQueue(
             name="depth", maxSize=4, blocking=False
@@ -147,11 +136,6 @@ class OakdSpatialYolo:
         self.sync = HostSync()
         self.bird_eye_frame = self.create_bird_frame()
 
-    def set_camera_brightness(self, brightness: int) -> None:
-        ctrl = dai.CameraControl()
-        ctrl.setBrightness(brightness)
-        self.qControl.send(ctrl)
-
     def get_labels(self):
         return self.labels
 
@@ -160,7 +144,6 @@ class OakdSpatialYolo:
         pipeline = dai.Pipeline()
 
         # Define sources and outputs
-        controlIn = pipeline.create(dai.node.XLinkIn)
         camRgb = pipeline.create(dai.node.ColorCamera)
         camRgb.initialControl.setManualFocus(130)
         camRgb.setPreviewKeepAspectRatio(False)
@@ -171,20 +154,14 @@ class OakdSpatialYolo:
         stereo = pipeline.create(dai.node.StereoDepth)
 
         xoutRgb = pipeline.create(dai.node.XLinkOut)
-        controlIn.setStreamName("control")
         xoutRgb.setStreamName("rgb")
 
         # Properties
-        controlIn.out.link(camRgb.inputControl)
         camRgb.setPreviewSize(self.width, int(self.width * 9 / 16))
         camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
         camRgb.setInterleaved(False)
         camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
         camRgb.setFps(self.fps)
-
-        xoutIsp = pipeline.create(dai.node.XLinkOut)
-        xoutIsp.setStreamName("isp")
-        camRgb.isp.link(xoutIsp.input)
 
         # Use ImageMqnip to resize with letterboxing
         manip = pipeline.create(dai.node.ImageManip)
@@ -192,21 +169,21 @@ class OakdSpatialYolo:
         manip.initialConfig.setResizeThumbnail(self.width, self.height)
         camRgb.preview.link(manip.inputImage)
 
-        monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+        monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_480_P)
         monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
-        monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+        monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_480_P)
         monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
         # setting node configs
         stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
         stereo.setLeftRightCheck(True)
-        # stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
+        stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
         monoLeft.out.link(stereo.left)
         monoRight.out.link(stereo.right)
         monoRight.setFps(self.fps)
         monoLeft.setFps(self.fps)
 
-        spatialDetectionNetwork.setBlobPath(self.nnPath)
+        spatialDetectionNetwork.setBlobPath(self.nn_path)
         spatialDetectionNetwork.setConfidenceThreshold(self.confidenceThreshold)
         spatialDetectionNetwork.input.setBlocking(False)
         spatialDetectionNetwork.setBoundingBoxScaleFactor(0.5)
@@ -245,8 +222,6 @@ class OakdSpatialYolo:
             self.sync.add_msg("rgb", self.qRgb.get())
         if self.qDepth.has():
             self.sync.add_msg("depth", self.qDepth.get())
-        if self.qIsp.has():
-            self.qIsp.get()
         if self.qDet.has():
             self.sync.add_msg("detections", self.qDet.get())
             self.counter += 1
@@ -269,7 +244,7 @@ class OakdSpatialYolo:
         return frame, detections
 
     def display_frame(self, name, frame, detections):
-        height = frame.shape[1] * 9 / 16
+        height = int(frame.shape[1] * 9 / 16)
         width = frame.shape[1]
         brank_height = width - height
         frame = frame[
@@ -284,7 +259,6 @@ class OakdSpatialYolo:
             ),
         )
         display = frame
-        display = cv2.flip(display, 1)
         # If the frame is available, draw bounding boxes on it and show the frame
         for detection in detections:
             # Fix ymin and ymax to cropped frame pos
@@ -295,8 +269,6 @@ class OakdSpatialYolo:
                 brank_height / 2 / height
             )
             # Denormalize bounding box
-            detection.xmin = 1 - detection.xmin
-            detection.xmax = 1 - detection.xmax
             bbox = self.frame_norm(
                 frame,
                 (
@@ -311,7 +283,7 @@ class OakdSpatialYolo:
             y1 = bbox[1]
             y2 = bbox[3]
             try:
-                label = labels[detection.label]
+                label = self.labels[detection.label]
             except:
                 label = detection.label
             self.text.putText(display, str(label), (x2 + 10, y1 + 20))
@@ -340,14 +312,14 @@ class OakdSpatialYolo:
             self.draw_bird_frame(
                 detection.spatialCoordinates.x,
                 detection.spatialCoordinates.z,
-                detection.label,
+                detection.label
             )
         cv2.putText(
             display,
             "NN fps: {:.2f}".format(self.counter / (time.monotonic() - self.startTime)),
             (2, display.shape[0] - 4),
             cv2.FONT_HERSHEY_TRIPLEX,
-            1,
+            0.3,
             (255, 255, 255),
         )
         # Show the frame
@@ -381,7 +353,7 @@ class OakdSpatialYolo:
         global MAX_Z
         max_x = MAX_Z / 2  # mm
         pointY = birds.shape[0] - int(z / (MAX_Z - 10000) * birds.shape[0]) - 20
-        pointX = int(-x / max_x * birds.shape[1] + birds.shape[1] / 2)
+        pointX = int(x / max_x * birds.shape[1] + birds.shape[1] / 2)
         if id is not None:
             # cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
             #           cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0))
@@ -404,8 +376,9 @@ class OakdSpatialYolo:
                 lineType=8,
                 shift=0,
             )
+        cv2.imshow("birds", birds)
 
-    def saveImage(self, frame):
+    def save_image(self, frame):
         if not self.is_save_start:
             now = datetime.datetime.now()
             date = now.strftime("%Y%m%d%H%M")
