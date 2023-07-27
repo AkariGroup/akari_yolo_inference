@@ -1,31 +1,30 @@
 #!/usr/bin/env python
 
 import contextlib
-import datetime
 import json
 import math
-import os
 import time
+from pathlib import Path
+from typing import Any, List, Tuple, Union
+
 import blobconverter
 import cv2
 import depthai as dai
 import numpy as np
-from pathlib import Path
-from typing import Any, List, Tuple, Union
 
 DISPLAY_WINDOW_SIZE_RATE = 2.0
 MAX_Z = 15000
 idColors = np.random.random(size=(256, 3)) * 256
 
 
-class TextHelper:
+class TextHelper(object):
     def __init__(self) -> None:
         self.bg_color = (0, 0, 0)
         self.color = (255, 255, 255)
         self.text_type = cv2.FONT_HERSHEY_SIMPLEX
         self.line_type = cv2.LINE_AA
 
-    def putText(self, frame: np.ndarray, text: str, coords: Tuple[float]) -> None:
+    def put_text(self, frame: np.ndarray, text: str, coords: Tuple[float]) -> None:
         cv2.putText(
             frame, text, coords, self.text_type, 0.8, self.bg_color, 3, self.line_type
         )
@@ -38,17 +37,17 @@ class TextHelper:
         cv2.rectangle(frame, p1, p2, idColors[id], 2)
 
 
-class HostSync:
+class HostSync(object):
     def __init__(self):
         self.dict = {}
 
-    def add_msg(self, name: str, msg: Any):
+    def add_msg(self, name: str, msg: Any) -> None:
         seq = str(msg.getSequenceNum())
         if seq not in self.dict:
             self.dict[seq] = {}
         self.dict[seq][name] = msg
 
-    def get_msgs(self):
+    def get_msgs(self) -> Any:
         remove = []
         for name in self.dict:
             remove.append(name)
@@ -60,7 +59,7 @@ class HostSync:
         return None
 
 
-class OakdSpatialYolo:
+class OakdSpatialYolo(object):
     def __init__(
         self,
         config_path: str,
@@ -130,7 +129,6 @@ class OakdSpatialYolo:
         self.frame_name = 0
         self.dir_name = ""
         self.path = ""
-        self.is_save_start = False
         self.num = 0
         self.text = TextHelper()
         self.sync = HostSync()
@@ -295,25 +293,25 @@ class OakdSpatialYolo:
                 label = self.labels[detection.label]
             except:
                 label = detection.label
-            self.text.putText(display, str(label), (x1 + 10, y1 + 20))
-            self.text.putText(
+            self.text.put_text(display, str(label), (x1 + 10, y1 + 20))
+            self.text.put_text(
                 display,
                 "{:.0f}%".format(detection.confidence * 100),
                 (x1 + 10, y1 + 50),
             )
             self.text.rectangle(display, (x1, y1), (x2, y2), detection.label)
             if detection.spatialCoordinates.z != 0:
-                self.text.putText(
+                self.text.put_text(
                     display,
                     "X: {:.2f} m".format(detection.spatialCoordinates.x / 1000),
                     (x1 + 10, y1 + 80),
                 )
-                self.text.putText(
+                self.text.put_text(
                     display,
                     "Y: {:.2f} m".format(detection.spatialCoordinates.y / 1000),
                     (x1 + 10, y1 + 110),
                 )
-                self.text.putText(
+                self.text.put_text(
                     display,
                     "Z: {:.2f} m".format(detection.spatialCoordinates.z / 1000),
                     (x1 + 10, y1 + 140),
@@ -386,15 +384,3 @@ class OakdSpatialYolo:
                 shift=0,
             )
         cv2.imshow("birds", birds)
-
-    def save_image(self, frame: np.ndarray) -> None:
-        if not self.is_save_start:
-            now = datetime.datetime.now()
-            date = now.strftime("%Y%m%d%H%M")
-            self.path = os.path.dirname(os.getcwd()) + "/data/" + date
-            os.makedirs(self.path, exist_ok=True)
-            self.is_save_start = True
-        file_path = self.path + "/" + str(self.num).zfill(3) + ".jpg"
-        cv2.imwrite(file_path, frame)
-        print("save to: " + file_path)
-        self.num += 1

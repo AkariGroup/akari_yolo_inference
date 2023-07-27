@@ -1,36 +1,33 @@
 #!/usr/bin/env python
 
 import contextlib
-import datetime
 import json
-import os
 import time
 from pathlib import Path
+from typing import Any, List, Tuple, Union
 
 import blobconverter
 import cv2
 import depthai as dai
 import numpy as np
 
-WIDTH = 640
-HEIGHT = 640
 BLACK = (255, 255, 255)
-GREEN = (0, 255, 0)
-BLUE = (255, 0, 0)
-DISPLAY_WINDOW_SIZE = 1.5
+DISPLAY_WINDOW_SIZE_RATE = 2.0
 
 
-class OakdYolo:
-    def __init__(self, configPath: str, modelPath: str) -> None:
-        if not Path(configPath).exists():
-            raise ValueError("Path {} does not poetry exist!".format(configPath))
-        with Path(configPath).open() as f:
+class OakdYolo(object):
+    def __init__(self, config_path: str, model_path: str, fps: int = 10) -> None:
+        if not Path(config_path).exists():
+            raise ValueError("Path {} does not poetry exist!".format(config_path))
+        with Path(config_path).open() as f:
             config = json.load(f)
         nnConfig = config.get("nn_config", {})
 
         # parse input shape
         if "input_size" in nnConfig:
-            W, H = tuple(map(int, nnConfig.get("input_size").split("x")))
+            self.width, self.height = tuple(
+                map(int, nnConfig.get("input_size").split("x"))
+            )
 
         # extract metadata
         metadata = nnConfig.get("NN_specific_metadata", {})
@@ -42,11 +39,12 @@ class OakdYolo:
         self.confidenceThreshold = metadata.get("confidence_threshold", {})
 
         print(metadata)
+        self.cam_fps = fps
         # parse labels
         nnMappings = config.get("mappings", {})
         self.labels = nnMappings.get("labels", {})
 
-        self.nnPath = Path(modelPath)
+        self.nnPath = Path(model_path)
         # get model path
         if not self.nnPath.exists():
             print(
@@ -56,7 +54,7 @@ class OakdYolo:
             )
             self.nnPath = str(
                 blobconverter.from_zoo(
-                    modelPath, shaves=6, zoo_type="depthai", use_cache=True
+                    model_path, shaves=6, zoo_type="depthai", use_cache=True
                 )
             )
 
@@ -75,9 +73,7 @@ class OakdYolo:
         self.frame_name = 0
         self.dir_name = ""
         self.path = ""
-        self.is_save_start = False
         self.num = 0
-        self.startTime = time.monotonic()
         self.counter = 0
 
     def set_camera_brightness(self, brightness: int) -> None:
@@ -106,21 +102,19 @@ class OakdYolo:
         # Properties
         controlIn.out.link(camRgb.inputControl)
         camRgb.setPreviewKeepAspectRatio(False)
-        # camRgb.setPreviewSize(W, H)
         camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
         camRgb.setInterleaved(False)
         camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
-        # camRgb.setIspScale(1, 2)
         camRgb.setPreviewSize(1920, 1080)
-        camRgb.setFps(10)
+        camRgb.setFps(self.cam_fps)
 
         xoutIsp = pipeline.create(dai.node.XLinkOut)
         xoutIsp.setStreamName("isp")
         camRgb.isp.link(xoutIsp.input)
 
         manip = pipeline.create(dai.node.ImageManip)
-        manip.setMaxOutputFrameSize(WIDTH * HEIGHT * 3)  # 640x640x3
-        manip.initialConfig.setResizeThumbnail(WIDTH, HEIGHT)
+        manip.setMaxOutputFrameSize(self.width * self.height * 3)  # 640x640x3
+        manip.initialConfig.setResizeThumbnail(self.width, self.height)
         camRgb.preview.link(manip.inputImage)
 
         # Network specific settings
@@ -135,19 +129,17 @@ class OakdYolo:
         detectionNetwork.input.setBlocking(False)
 
         # Linking
-        # camRgb.preview.link(detectionNetwork.input)
         manip.out.link(detectionNetwork.input)
         detectionNetwork.passthrough.link(xoutRgb.input)
         detectionNetwork.out.link(nnOut.input)
         return pipeline
 
-    # nn data, being the bounding box locations, are in <0..1> range - they need to be normalized with frame width/height
-    def frameNorm(self, frame, bbox):
+    def frame_norm(self, frame: np.ndarray, bbox: Tuple[float]) -> List[int]:
         normVals = np.full(len(bbox), frame.shape[0])
         normVals[::2] = frame.shape[1]
         return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
 
-    def getFrame(self):
+    def get_frame(self) -> Union[np.ndarray, List[Any]]:
         inRgb = self.qRgb.get()
         inIsp = self.qIsp.get()
         inDet = self.qDet.get()
@@ -170,7 +162,9 @@ class OakdYolo:
             self.counter += 1
         return frame, detections
 
-    def displayFrame(self, name, frame, detections, focus_index):
+    def display_frame(
+        self, name: str, frame: np.ndarray, detections: List[Any]
+    ) -> None:
         width = frame.shape[1]
         height = frame.shape[1] * 9 / 16
         brank_height = width - height
@@ -178,64 +172,47 @@ class OakdYolo:
             int(brank_height / 2) : int(frame.shape[0] - brank_height / 2), 0:width
         ]
         frame = cv2.resize(
-            frame, (int(width * DISPLAY_WINDOW_SIZE), int(height * DISPLAY_WINDOW_SIZE))
+            frame,
+            (
+                int(width * DISPLAY_WINDOW_SIZE_RATE),
+                int(height * DISPLAY_WINDOW_SIZE_RATE),
+            ),
         )
-        for i in range(0, len(detections)):
-            detections[i].ymin = (width / height) * detections[i].ymin - (
+        for detection in detections:
+            # Fix ymin and ymax to cropped frame pos
+            detection.ymin = (width / height) * detection.ymin - (
                 brank_height / 2 / height
             )
-            detections[i].ymax = (width / height) * detections[i].ymax - (
+            detection.ymax = (width / height) * detection.ymax - (
                 brank_height / 2 / height
             )
-            if i == focus_index:
-                color = GREEN
-            else:
-                color = BLUE
-            bbox = self.frameNorm(
-                frame,
-                (
-                    detections[i].xmin,
-                    detections[i].ymin,
-                    detections[i].xmax,
-                    detections[i].ymax,
-                ),
+            bbox = self.frame_norm(
+                frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax)
             )
             cv2.putText(
                 frame,
-                self.labels[detections[i].label],
+                self.labels[detection.label],
                 (bbox[0] + 10, bbox[1] + 20),
                 cv2.FONT_HERSHEY_TRIPLEX,
                 0.5,
-                color,
+                255,
             )
             cv2.putText(
                 frame,
-                f"{int(detections[i].confidence * 100)}%",
+                f"{int(detection.confidence * 100)}%",
                 (bbox[0] + 10, bbox[1] + 40),
                 cv2.FONT_HERSHEY_TRIPLEX,
                 0.5,
-                color,
+                255,
             )
-            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
+            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
         cv2.putText(
             frame,
             "NN fps: {:.2f}".format(self.counter / (time.monotonic() - self.startTime)),
             (2, frame.shape[0] - 4),
             cv2.FONT_HERSHEY_TRIPLEX,
-            0.5,
+            0.4,
             (255, 255, 255),
         )
         # Show the frame
         cv2.imshow(name, frame)
-
-    def saveImage(self, frame):
-        if not self.is_save_start:
-            now = datetime.datetime.now()
-            date = now.strftime("%Y%m%d%H%M")
-            self.path = os.path.dirname(os.getcwd()) + "/data/" + date
-            os.makedirs(self.path, exist_ok=True)
-            self.is_save_start = True
-        file_path = self.path + "/" + str(self.num).zfill(3) + ".jpg"
-        cv2.imwrite(file_path, frame)
-        print("save to: " + file_path)
-        self.num += 1
