@@ -316,11 +316,7 @@ class OakdSpatialYolo(object):
                     "Z: {:.2f} m".format(detection.spatialCoordinates.z / 1000),
                     (x1 + 10, y1 + 140),
                 )
-            self.draw_bird_frame(
-                detection.spatialCoordinates.x,
-                detection.spatialCoordinates.z,
-                detection.label,
-            )
+        self.draw_bird_frame(detections)
         cv2.putText(
             display,
             "NN fps: {:.2f}".format(self.counter / (time.monotonic() - self.startTime)),
@@ -355,32 +351,44 @@ class OakdSpatialYolo(object):
         cv2.fillPoly(frame, [fov_cnt], color=(70, 70, 70))
         return frame
 
-    def draw_bird_frame(self, x: float, z: float, id: int = None) -> None:
+    def draw_bird_frame(self, detections: List[Any]) -> None:
         birds = self.bird_eye_frame.copy()
         global MAX_Z
         max_x = MAX_Z / 2  # mm
-        pointY = birds.shape[0] - int(z / (MAX_Z - 10000) * birds.shape[0]) - 20
-        pointX = int(x / max_x * birds.shape[1] + birds.shape[1] / 2)
-        if id is not None:
-            # cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
-            #           cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0))
-            cv2.circle(
-                birds,
-                (pointX, pointY),
-                2,
-                idColors[id],
-                thickness=5,
-                lineType=8,
-                shift=0,
+        for i in range(0, len(detections)):
+            pointY = (
+                birds.shape[0]
+                - int(
+                    detections[i].spatialCoordinates.z
+                    / (MAX_Z - 10000)
+                    * birds.shape[0]
+                )
+                - 20
             )
-        else:
-            cv2.circle(
-                birds,
-                (pointX, pointY),
-                2,
-                (0, 255, 0),
-                thickness=5,
-                lineType=8,
-                shift=0,
+            pointX = int(
+                detections[i].spatialCoordinates.x / max_x * birds.shape[1]
+                + birds.shape[1] / 2
             )
+            if detections[i].label is not None:
+                # cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
+                #           cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0))
+                cv2.circle(
+                    birds,
+                    (pointX, pointY),
+                    2,
+                    idColors[detections[i].label],
+                    thickness=5,
+                    lineType=8,
+                    shift=0,
+                )
+            else:
+                cv2.circle(
+                    birds,
+                    (pointX, pointY),
+                    2,
+                    (0, 255, 0),
+                    thickness=5,
+                    lineType=8,
+                    shift=0,
+                )
         cv2.imshow("birds", birds)
