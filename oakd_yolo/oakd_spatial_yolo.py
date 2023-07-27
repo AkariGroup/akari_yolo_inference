@@ -7,6 +7,7 @@ import math
 import os
 import time
 from pathlib import Path
+from typing import Any, List, Tuple, Union
 
 import blobconverter
 import cv2
@@ -25,7 +26,7 @@ class TextHelper:
         self.text_type = cv2.FONT_HERSHEY_SIMPLEX
         self.line_type = cv2.LINE_AA
 
-    def putText(self, frame, text, coords):
+    def putText(self, frame: np.ndarray, text: str, coords: Tuple[float]) -> None:
         cv2.putText(
             frame, text, coords, self.text_type, 0.8, self.bg_color, 3, self.line_type
         )
@@ -33,7 +34,7 @@ class TextHelper:
             frame, text, coords, self.text_type, 0.8, self.color, 1, self.line_type
         )
 
-    def rectangle(self, frame, p1, p2, id):
+    def rectangle(self, frame: np.ndarray, p1: Tuple[float], p2: Tuple[float], id: int):
         cv2.rectangle(frame, p1, p2, (0, 0, 0), 4)
         cv2.rectangle(frame, p1, p2, idColors[id], 2)
 
@@ -42,7 +43,7 @@ class HostSync:
     def __init__(self):
         self.dict = {}
 
-    def add_msg(self, name, msg):
+    def add_msg(self, name: str, msg: Any):
         seq = str(msg.getSequenceNum())
         if seq not in self.dict:
             self.dict[seq] = {}
@@ -142,10 +143,10 @@ class OakdSpatialYolo:
     def _create_pipeline(self) -> dai.Pipeline:
         # Create pipeline
         pipeline = dai.Pipeline()
+        device = dai.Device()
 
         # Define sources and outputs
         camRgb = pipeline.create(dai.node.ColorCamera)
-        camRgb.initialControl.setManualFocus(130)
         camRgb.setPreviewKeepAspectRatio(False)
 
         spatialDetectionNetwork = pipeline.create(dai.node.YoloSpatialDetectionNetwork)
@@ -157,12 +158,19 @@ class OakdSpatialYolo:
         xoutRgb.setStreamName("rgb")
 
         # Properties
-        camRgb.setPreviewSize(self.width, int(self.width * 9 / 16))
+        camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
+        camRgb.setPreviewSize(1920, 1080)
         camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
         camRgb.setInterleaved(False)
         camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
         camRgb.setFps(self.fps)
-
+        try:
+            calibData = device.readCalibration2()
+            lensPosition = calibData.getLensPosition(dai.CameraBoardSocket.CAM_A)
+            if lensPosition:
+                camRgb.initialControl.setManualFocus(lensPosition)
+        except:
+            raise
         # Use ImageMqnip to resize with letterboxing
         manip = pipeline.create(dai.node.ImageManip)
         manip.setMaxOutputFrameSize(self.width * self.height * 3)
@@ -210,12 +218,12 @@ class OakdSpatialYolo:
         spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
         return pipeline
 
-    def frame_norm(self, frame, bbox):
+    def frame_norm(self, frame: np.ndarray, bbox: Tuple[float]) -> List[int]:
         normVals = np.full(len(bbox), frame.shape[0])
         normVals[::2] = frame.shape[1]
         return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
 
-    def get_frame(self):
+    def get_frame(self) -> Union[np.ndarray, List[Any]]:
         frame = None
         detections = []
         if self.qRgb.has():
@@ -243,7 +251,9 @@ class OakdSpatialYolo:
                 )
         return frame, detections
 
-    def display_frame(self, name, frame, detections):
+    def display_frame(
+        self, name: str, frame: np.ndarray, detections: List[Any]
+    ) -> None:
         height = int(frame.shape[1] * 9 / 16)
         width = frame.shape[1]
         brank_height = width - height
@@ -286,33 +296,33 @@ class OakdSpatialYolo:
                 label = self.labels[detection.label]
             except:
                 label = detection.label
-            self.text.putText(display, str(label), (x2 + 10, y1 + 20))
+            self.text.putText(display, str(label), (x1 + 10, y1 + 20))
             self.text.putText(
                 display,
                 "{:.0f}%".format(detection.confidence * 100),
-                (x2 + 10, y1 + 50),
+                (x1 + 10, y1 + 50),
             )
             self.text.rectangle(display, (x1, y1), (x2, y2), detection.label)
             if detection.spatialCoordinates.z != 0:
                 self.text.putText(
                     display,
                     "X: {:.2f} m".format(detection.spatialCoordinates.x / 1000),
-                    (x2 + 10, y1 + 80),
+                    (x1 + 10, y1 + 80),
                 )
                 self.text.putText(
                     display,
                     "Y: {:.2f} m".format(detection.spatialCoordinates.y / 1000),
-                    (x2 + 10, y1 + 110),
+                    (x1 + 10, y1 + 110),
                 )
                 self.text.putText(
                     display,
                     "Z: {:.2f} m".format(detection.spatialCoordinates.z / 1000),
-                    (x2 + 10, y1 + 140),
+                    (x1 + 10, y1 + 140),
                 )
             self.draw_bird_frame(
                 detection.spatialCoordinates.x,
                 detection.spatialCoordinates.z,
-                detection.label
+                detection.label,
             )
         cv2.putText(
             display,
@@ -325,7 +335,7 @@ class OakdSpatialYolo:
         # Show the frame
         cv2.imshow(name, display)
 
-    def create_bird_frame(self):
+    def create_bird_frame(self) -> np.ndarray:
         fov = self.fov
         frame = np.zeros((300, 300, 3), np.uint8)
         cv2.rectangle(
@@ -348,7 +358,7 @@ class OakdSpatialYolo:
         cv2.fillPoly(frame, [fov_cnt], color=(70, 70, 70))
         return frame
 
-    def draw_bird_frame(self, x, z, id=None):
+    def draw_bird_frame(self, x: float, z: float, id: int = None) -> None:
         birds = self.bird_eye_frame.copy()
         global MAX_Z
         max_x = MAX_Z / 2  # mm
@@ -378,7 +388,7 @@ class OakdSpatialYolo:
             )
         cv2.imshow("birds", birds)
 
-    def save_image(self, frame):
+    def save_image(self, frame: np.ndarray) -> None:
         if not self.is_save_start:
             now = datetime.datetime.now()
             date = now.strftime("%Y%m%d%H%M")
