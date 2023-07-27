@@ -6,13 +6,12 @@ import json
 import math
 import os
 import time
-from pathlib import Path
-from typing import Any, List, Tuple, Union
-
 import blobconverter
 import cv2
 import depthai as dai
 import numpy as np
+from pathlib import Path
+from typing import Any, List, Tuple, Union
 
 DISPLAY_WINDOW_SIZE_RATE = 2.0
 MAX_Z = 15000

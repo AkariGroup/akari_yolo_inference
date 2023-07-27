@@ -9,6 +9,7 @@ from oakd_yolo.oakd_spatial_yolo import OakdSpatialYolo
 
 fov = 56.7
 
+
 def convert_to_pos_from_akari(pos: Any, pitch: float, yaw: float) -> Any:
     cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
     arr_y = np.array(
@@ -75,8 +76,9 @@ def main() -> None:
         args.config, args.model, args.fps, fov, args.display_camera
     )
 
-    if(args.robot_coordinate):
+    if args.robot_coordinate:
         from akari_client import AkariClient
+
         akari = AkariClient()
         joints = akari.joints
 
@@ -84,13 +86,13 @@ def main() -> None:
         frame = None
         detections = []
         frame, detections = oakd_spatial_yolo.get_frame()
-        if (args.robot_coordinate):
+        if args.robot_coordinate:
             head_pos = joints.get_joint_positions()
             pitch = head_pos["tilt"]
             yaw = head_pos["pan"]
         if frame is not None:
             for detection in detections:
-                if (args.robot_coordinate):
+                if args.robot_coordinate:
                     converted_pos = convert_to_pos_from_akari(
                         detection.spatialCoordinates, -1 * pitch, -1 * yaw
                     )
