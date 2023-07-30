@@ -38,8 +38,7 @@ def main() -> None:
         frame = None
         detections = []
         frame, detections = oakd_yolo.get_frame()
-        if frame is not None:
-            oakd_yolo.display_frame("nn", frame, detections)
+        oakd_yolo.display_frame("nn", frame, detections)
         if cv2.waitKey(1) == ord("q"):
             break
 

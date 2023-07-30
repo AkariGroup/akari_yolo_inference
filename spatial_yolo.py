@@ -92,16 +92,15 @@ def main() -> None:
             head_pos = joints.get_joint_positions()
             pitch = head_pos["tilt"]
             yaw = head_pos["pan"]
-        if frame is not None:
-            for detection in detections:
-                if args.robot_coordinate:
-                    converted_pos = convert_to_pos_from_akari(
-                        detection.spatialCoordinates, -1 * pitch, -1 * yaw
-                    )
-                    detection.spatialCoordinates.x = converted_pos[0][0]
-                    detection.spatialCoordinates.y = converted_pos[1][0]
-                    detection.spatialCoordinates.z = converted_pos[2][0]
-            oakd_spatial_yolo.display_frame("nn", frame, detections)
+        for detection in detections:
+            if args.robot_coordinate:
+                converted_pos = convert_to_pos_from_akari(
+                    detection.spatialCoordinates, -1 * pitch, -1 * yaw
+                )
+                detection.spatialCoordinates.x = converted_pos[0][0]
+                detection.spatialCoordinates.y = converted_pos[1][0]
+                detection.spatialCoordinates.z = converted_pos[2][0]
+        oakd_spatial_yolo.display_frame("nn", frame, detections)
         if cv2.waitKey(1) == ord("q"):
             break
 
