@@ -307,42 +307,51 @@ class OakdTrackingYolo(object):
             height = int(frame.shape[1] * 9 / 16)
             width = frame.shape[1]
             brank_height = width - height
-            for tracklet in tracklets:
-                roi = tracklet.roi.denormalize(frame.shape[1], frame.shape[0])
-                x1 = int(roi.topLeft().x)
-                y1 = int(roi.topLeft().y)
-                x2 = int(roi.bottomRight().x)
-                y2 = int(roi.bottomRight().y)
-                try:
-                    label = self.labels[tracklet.label]
-                except:
-                    label = tracklet.label
-                if tracklet.status.name == "TRACKED":
-                    self.text.put_text(frame, str(label), (x1 + 10, y1 + 20))
-                    self.text.put_text(
-                        frame,
-                        f"ID: {[tracklet.id]}",
-                        (x1 + 10, y1 + 45),
-                    )
-                    self.text.put_text(frame, tracklet.status.name, (x1 + 10, y1 + 70))
+            if tracklets is not None:
+                for tracklet in tracklets:
+                    if tracklet.status.name == "TRACKED":
+                        roi = tracklet.roi.denormalize(frame.shape[1], frame.shape[0])
+                        x1 = int(roi.topLeft().x)
+                        y1 = int(roi.topLeft().y)
+                        x2 = int(roi.bottomRight().x)
+                        y2 = int(roi.bottomRight().y)
+                        try:
+                            label = self.labels[tracklet.label]
+                        except:
+                            label = tracklet.label
+                        self.text.put_text(frame, str(label), (x1 + 10, y1 + 20))
+                        self.text.put_text(
+                            frame,
+                            f"ID: {[tracklet.id]}",
+                            (x1 + 10, y1 + 45),
+                        )
+                        self.text.put_text(
+                            frame, tracklet.status.name, (x1 + 10, y1 + 70)
+                        )
 
-                    self.text.rectangle(frame, (x1, y1), (x2, y2), tracklet.id)
-                    if tracklet.spatialCoordinates.z != 0:
-                        self.text.put_text(
-                            frame,
-                            "X: {:.2f} m".format(tracklet.spatialCoordinates.x / 1000),
-                            (x1 + 10, y1 + 95),
-                        )
-                        self.text.put_text(
-                            frame,
-                            "Y: {:.2f} m".format(tracklet.spatialCoordinates.y / 1000),
-                            (x1 + 10, y1 + 120),
-                        )
-                        self.text.put_text(
-                            frame,
-                            "Z: {:.2f} m".format(tracklet.spatialCoordinates.z / 1000),
-                            (x1 + 10, y1 + 145),
-                        )
+                        self.text.rectangle(frame, (x1, y1), (x2, y2), tracklet.id)
+                        if tracklet.spatialCoordinates.z != 0:
+                            self.text.put_text(
+                                frame,
+                                "X: {:.2f} m".format(
+                                    tracklet.spatialCoordinates.x / 1000
+                                ),
+                                (x1 + 10, y1 + 95),
+                            )
+                            self.text.put_text(
+                                frame,
+                                "Y: {:.2f} m".format(
+                                    tracklet.spatialCoordinates.y / 1000
+                                ),
+                                (x1 + 10, y1 + 120),
+                            )
+                            self.text.put_text(
+                                frame,
+                                "Z: {:.2f} m".format(
+                                    tracklet.spatialCoordinates.z / 1000
+                                ),
+                                (x1 + 10, y1 + 145),
+                            )
             self.draw_bird_frame(tracklets)
             cv2.putText(
                 frame,
@@ -384,28 +393,31 @@ class OakdTrackingYolo(object):
         birds = self.bird_eye_frame.copy()
         global MAX_Z
         max_x = MAX_Z / 2  # mm
-        for i in range(0, len(tracklets)):
-            pointY = (
-                birds.shape[0]
-                - int(
-                    tracklets[i].spatialCoordinates.z / (MAX_Z - 10000) * birds.shape[0]
-                )
-                - 20
-            )
-            pointX = int(
-                tracklets[i].spatialCoordinates.x / max_x * birds.shape[1]
-                + birds.shape[1] / 2
-            )
-            if tracklets[i].status.name == "TRACKED":
-                # cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
-                #           cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0))
-                cv2.circle(
-                    birds,
-                    (pointX, pointY),
-                    2,
-                    idColors[tracklets[i].id],
-                    thickness=5,
-                    lineType=8,
-                    shift=0,
-                )
+        if tracklets is not None:
+            for i in range(0, len(tracklets)):
+                if tracklets[i].status.name == "TRACKED":
+                    pointY = (
+                        birds.shape[0]
+                        - int(
+                            tracklets[i].spatialCoordinates.z
+                            / (MAX_Z - 10000)
+                            * birds.shape[0]
+                        )
+                        - 20
+                    )
+                    pointX = int(
+                        tracklets[i].spatialCoordinates.x / max_x * birds.shape[1]
+                        + birds.shape[1] / 2
+                    )
+                    # cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
+                    #           cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0))
+                    cv2.circle(
+                        birds,
+                        (pointX, pointY),
+                        2,
+                        idColors[tracklets[i].id],
+                        thickness=5,
+                        lineType=8,
+                        shift=0,
+                    )
         cv2.imshow("birds", birds)
