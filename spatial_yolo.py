@@ -9,11 +9,13 @@ import numpy as np
 
 from oakd_yolo.oakd_spatial_yolo import OakdSpatialYolo
 
-#OAK-D LITEの視野角
+# OAK-D LITEの視野角
 fov = 56.7
 
 
 def convert_to_pos_from_akari(pos: Any, pitch: float, yaw: float) -> Any:
+    pitch = -1 * pitch
+    yaw = -1 * yaw
     cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
     arr_y = np.array(
         [
@@ -96,7 +98,7 @@ def main() -> None:
         for detection in detections:
             if args.robot_coordinate:
                 converted_pos = convert_to_pos_from_akari(
-                    detection.spatialCoordinates, -1 * pitch, -1 * yaw
+                    detection.spatialCoordinates, pitch, yaw
                 )
                 detection.spatialCoordinates.x = converted_pos[0][0]
                 detection.spatialCoordinates.y = converted_pos[1][0]
