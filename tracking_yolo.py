@@ -9,10 +9,13 @@ import numpy as np
 
 from oakd_yolo.oakd_tracking_yolo import OakdTrackingYolo
 
+#OAK-D LITEの視野角
 fov = 56.7
 
 
 def convert_to_pos_from_akari(pos: Any, pitch: float, yaw: float) -> Any:
+    pitch = -1 * pitch
+    yaw = -1 * yaw
     cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
     arr_y = np.array(
         [
@@ -88,21 +91,28 @@ def main() -> None:
     while True:
         frame = None
         detections = []
-        frame, detections,tracklets = oakd_tracking_yolo.get_frame()
+        frame, detections, tracklets = oakd_tracking_yolo.get_frame()
         if args.robot_coordinate:
             head_pos = joints.get_joint_positions()
             pitch = head_pos["tilt"]
             yaw = head_pos["pan"]
         if frame is not None:
-            for detection in detections:
-                if args.robot_coordinate:
+            if args.robot_coordinate:
+                for detection in detections:
                     converted_pos = convert_to_pos_from_akari(
-                        detection.spatialCoordinates, -1 * pitch, -1 * yaw
+                        detection.spatialCoordinates, pitch, yaw
                     )
                     detection.spatialCoordinates.x = converted_pos[0][0]
                     detection.spatialCoordinates.y = converted_pos[1][0]
                     detection.spatialCoordinates.z = converted_pos[2][0]
-            oakd_tracking_yolo.display_frame("nn", frame, detections,tracklets)
+                for tracklet in tracklets:
+                    converted_pos = convert_to_pos_from_akari(
+                        tracklet.spatialCoordinates, pitch, yaw
+                    )
+                    tracklet.spatialCoordinates.x = converted_pos[0][0]
+                    tracklet.spatialCoordinates.y = converted_pos[1][0]
+                    tracklet.spatialCoordinates.z = converted_pos[2][0]
+            oakd_tracking_yolo.display_frame("nn", frame, tracklets)
         if cv2.waitKey(1) == ord("q"):
             break
 

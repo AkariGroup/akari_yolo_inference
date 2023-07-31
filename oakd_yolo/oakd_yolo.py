@@ -146,6 +146,60 @@ class OakdYolo(object):
 
         if inIsp is not None:
             frame = inRgb.getCvFrame()
+        if inDet is not None:
+            detections = inDet.detections
+            self.counter += 1
+            width = frame.shape[1]
+            height = frame.shape[1] * 9 / 16
+            brank_height = width - height
+            frame = frame[
+                int(brank_height / 2) : int(frame.shape[0] - brank_height / 2), 0:width
+            ]
+            for detection in detections:
+                # Fix ymin and ymax to cropped frame pos
+                detection.ymin = (width / height) * detection.ymin - (
+                    brank_height / 2 / height
+                )
+                detection.ymax = (width / height) * detection.ymax - (
+                    brank_height / 2 / height
+                )
+        return frame, detections
+
+    def display_frame(
+        self, name: str, frame: np.ndarray, detections: List[Any]
+    ) -> None:
+        if frame is not None:
+            frame = cv2.resize(
+                frame,
+                (
+                    int(frame.shape[1] * DISPLAY_WINDOW_SIZE_RATE),
+                    int(frame.shape[0] * DISPLAY_WINDOW_SIZE_RATE),
+                ),
+            )
+            for detection in detections:
+                bbox = self.frame_norm(
+                    frame,
+                    (detection.xmin, detection.ymin, detection.xmax, detection.ymax),
+                )
+                cv2.putText(
+                    frame,
+                    self.labels[detection.label],
+                    (bbox[0] + 10, bbox[1] + 20),
+                    cv2.FONT_HERSHEY_TRIPLEX,
+                    0.5,
+                    255,
+                )
+                cv2.putText(
+                    frame,
+                    f"{int(detection.confidence * 100)}%",
+                    (bbox[0] + 10, bbox[1] + 40),
+                    cv2.FONT_HERSHEY_TRIPLEX,
+                    0.5,
+                    255,
+                )
+                cv2.rectangle(
+                    frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2
+                )
             cv2.putText(
                 frame,
                 "NN fps: {:.2f}".format(
@@ -154,65 +208,7 @@ class OakdYolo(object):
                 (2, frame.shape[0] - 4),
                 cv2.FONT_HERSHEY_TRIPLEX,
                 0.4,
-                BLACK,
+                (255, 255, 255),
             )
-
-        if inDet is not None:
-            detections = inDet.detections
-            self.counter += 1
-        return frame, detections
-
-    def display_frame(
-        self, name: str, frame: np.ndarray, detections: List[Any]
-    ) -> None:
-        width = frame.shape[1]
-        height = frame.shape[1] * 9 / 16
-        brank_height = width - height
-        frame = frame[
-            int(brank_height / 2) : int(frame.shape[0] - brank_height / 2), 0:width
-        ]
-        frame = cv2.resize(
-            frame,
-            (
-                int(width * DISPLAY_WINDOW_SIZE_RATE),
-                int(height * DISPLAY_WINDOW_SIZE_RATE),
-            ),
-        )
-        for detection in detections:
-            # Fix ymin and ymax to cropped frame pos
-            detection.ymin = (width / height) * detection.ymin - (
-                brank_height / 2 / height
-            )
-            detection.ymax = (width / height) * detection.ymax - (
-                brank_height / 2 / height
-            )
-            bbox = self.frame_norm(
-                frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax)
-            )
-            cv2.putText(
-                frame,
-                self.labels[detection.label],
-                (bbox[0] + 10, bbox[1] + 20),
-                cv2.FONT_HERSHEY_TRIPLEX,
-                0.5,
-                255,
-            )
-            cv2.putText(
-                frame,
-                f"{int(detection.confidence * 100)}%",
-                (bbox[0] + 10, bbox[1] + 40),
-                cv2.FONT_HERSHEY_TRIPLEX,
-                0.5,
-                255,
-            )
-            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
-        cv2.putText(
-            frame,
-            "NN fps: {:.2f}".format(self.counter / (time.monotonic() - self.startTime)),
-            (2, frame.shape[0] - 4),
-            cv2.FONT_HERSHEY_TRIPLEX,
-            0.4,
-            (255, 255, 255),
-        )
-        # Show the frame
-        cv2.imshow(name, frame)
+            # Show the frame
+            cv2.imshow(name, frame)

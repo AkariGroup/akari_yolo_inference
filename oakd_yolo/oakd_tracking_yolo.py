@@ -208,10 +208,9 @@ class OakdTrackingYolo(object):
         spatialDetectionNetwork.setAnchors(self.anchors)
         spatialDetectionNetwork.setAnchorMasks(self.anchorMasks)
         spatialDetectionNetwork.setIouThreshold(self.iouThreshold)
-        a = []
-        for i in range(0, 79):
-            a.append(i)
-        objectTracker.setDetectionLabelsToTrack(a)  # track only person
+        # トラッキングする物体のIDを配列で渡す。
+        # ここではconfigファイル内の全物体をトラッキング対象に指定
+        objectTracker.setDetectionLabelsToTrack(list(range(self.classes)))
         # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
         objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
         # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
@@ -296,9 +295,7 @@ class OakdTrackingYolo(object):
                     tracklet.roi.height = tracklet.roi.height * width / height
         return frame, detections, tracklets
 
-    def display_frame(
-        self, name: str, frame: np.ndarray, detections: List[Any], trackletsData: Any
-    ) -> None:
+    def display_frame(self, name: str, frame: np.ndarray, tracklets: List[Any]) -> None:
         if frame is not None:
             frame = cv2.resize(
                 frame,
@@ -310,7 +307,7 @@ class OakdTrackingYolo(object):
             height = int(frame.shape[1] * 9 / 16)
             width = frame.shape[1]
             brank_height = width - height
-            for tracklet in trackletsData:
+            for tracklet in tracklets:
                 roi = tracklet.roi.denormalize(frame.shape[1], frame.shape[0])
                 x1 = int(roi.topLeft().x)
                 y1 = int(roi.topLeft().y)
@@ -320,7 +317,7 @@ class OakdTrackingYolo(object):
                     label = self.labels[tracklet.label]
                 except:
                     label = tracklet.label
-                if(tracklet.status.name == "TRACKED"):
+                if tracklet.status.name == "TRACKED":
                     self.text.put_text(frame, str(label), (x1 + 10, y1 + 20))
                     self.text.put_text(
                         frame,
@@ -346,7 +343,7 @@ class OakdTrackingYolo(object):
                             "Z: {:.2f} m".format(tracklet.spatialCoordinates.z / 1000),
                             (x1 + 10, y1 + 145),
                         )
-            self.draw_bird_frame(trackletsData)
+            self.draw_bird_frame(tracklets)
             cv2.putText(
                 frame,
                 "NN fps: {:.2f}".format(
@@ -391,9 +388,7 @@ class OakdTrackingYolo(object):
             pointY = (
                 birds.shape[0]
                 - int(
-                    tracklets[i].spatialCoordinates.z
-                    / (MAX_Z - 10000)
-                    * birds.shape[0]
+                    tracklets[i].spatialCoordinates.z / (MAX_Z - 10000) * birds.shape[0]
                 )
                 - 20
             )
