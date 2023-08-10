@@ -264,7 +264,7 @@ class OakdSpatialYolo(object):
         return frame, detections
 
     def display_frame(
-        self, name: str, frame: np.ndarray, detections: List[Any]
+        self, name: str, frame: np.ndarray, detections: List[Any], birds: bool = True
     ) -> None:
         if frame is not None:
             frame = cv2.resize(
@@ -316,10 +316,13 @@ class OakdSpatialYolo(object):
                         "Z: {:.2f} m".format(detection.spatialCoordinates.z / 1000),
                         (x1 + 10, y1 + 140),
                     )
-            self.draw_bird_frame(detections)
+            if birds:
+                self.draw_bird_frame(detections)
             cv2.putText(
                 frame,
-                "NN fps: {:.2f}".format(self.counter / (time.monotonic() - self.startTime)),
+                "NN fps: {:.2f}".format(
+                    self.counter / (time.monotonic() - self.startTime)
+                ),
                 (2, frame.shape[0] - 4),
                 cv2.FONT_HERSHEY_TRIPLEX,
                 0.3,

@@ -10,5 +10,3 @@
 build/
 dist/
 .venv
-
-internal/docker/.docker_credential
