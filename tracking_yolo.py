@@ -9,7 +9,7 @@ import numpy as np
 
 from oakd_yolo.oakd_tracking_yolo import OakdTrackingYolo
 
-#OAK-D LITEの視野角
+# OAK-D LITEの視野角
 fov = 56.7
 
 

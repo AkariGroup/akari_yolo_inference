@@ -295,7 +295,9 @@ class OakdTrackingYolo(object):
                     tracklet.roi.height = tracklet.roi.height * width / height
         return frame, detections, tracklets
 
-    def display_frame(self, name: str, frame: np.ndarray, tracklets: List[Any]) -> None:
+    def display_frame(
+        self, name: str, frame: np.ndarray, tracklets: List[Any], birds: bool = True
+    ) -> None:
         if frame is not None:
             frame = cv2.resize(
                 frame,
@@ -352,7 +354,8 @@ class OakdTrackingYolo(object):
                                 ),
                                 (x1 + 10, y1 + 145),
                             )
-            self.draw_bird_frame(tracklets)
+            if birds:
+                self.draw_bird_frame(tracklets)
             cv2.putText(
                 frame,
                 "NN fps: {:.2f}".format(
@@ -389,7 +392,7 @@ class OakdTrackingYolo(object):
         cv2.fillPoly(frame, [fov_cnt], color=(70, 70, 70))
         return frame
 
-    def draw_bird_frame(self, tracklets: List[Any]) -> None:
+    def draw_bird_frame(self, tracklets: List[Any], show_labels: bool = False) -> None:
         birds = self.bird_eye_frame.copy()
         global MAX_Z
         max_x = MAX_Z / 2  # mm
@@ -409,8 +412,15 @@ class OakdTrackingYolo(object):
                         tracklets[i].spatialCoordinates.x / max_x * birds.shape[1]
                         + birds.shape[1] / 2
                     )
-                    # cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
-                    #           cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0))
+                    if(show_labels):
+                        cv2.putText(
+                            birds,
+                            self.labels[tracklets[i].label],
+                            (pointX - 30, pointY + 5),
+                            cv2.FONT_HERSHEY_TRIPLEX,
+                            0.5,
+                            (0, 255, 0),
+                        )
                     cv2.circle(
                         birds,
                         (pointX, pointY),
