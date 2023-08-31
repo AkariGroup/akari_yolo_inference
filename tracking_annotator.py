@@ -20,10 +20,15 @@ fov = 56.7
 save_num: int = 0
 QUEUE_SIZE: int = 5
 
+
 def tracklets_to_annotation(tracklets: Any):
     annotation_text = ""
     for tracklet in tracklets:
-        annotation_text += f"{tracklet.label} {tracklet.roi.topLeft().x} {tracklet.roi.topLeft().y} {tracklet.roi.bottomRight().x} {tracklet.roi.bottomRight().y}\n"
+        center_x: float = (tracklet.roi.topLeft().x + tracklet.roi.bottomRight().x) / 2
+        center_y: float = (tracklet.roi.topLeft().y + tracklet.roi.bottomRight().y) / 2
+        width: float = tracklet.roi.bottomRight().x - tracklet.roi.topLeft().x
+        height: float = tracklet.roi.bottomRight().y - tracklet.roi.topLeft().y
+        annotation_text += f"{tracklet.label} {center_x} {center_y} {width} {height}\n"
     return annotation_text
 
 
@@ -37,28 +42,33 @@ def save_lost_frame(queue, path: str, save_tracked: bool = True) -> None:
         if tracklet.status.name == "TRACKED":
             if save_tracked:
                 save_track.append(tracklet)
-        else:
-            #LOSTの場合は最新のフレームがTRACKEDに復帰しているか見る
+        elif tracklet.status.name == "LOST":
+            # LOSTの場合は最新のフレームがTRACKEDに復帰しているか見る
             for now_tracklet in queue[-1][1]:
                 if (
                     now_tracklet.id == tracklet.id
                     and now_tracklet.status.name == "TRACKED"
                 ):
-                    #フレーム頭から2個前のフレームまでの間にTRACKEDの状態であれば、保存する
-                    prev_pairs = itertools.islice(queue, 0, len(queue)-2)
+                    # フレーム頭から2個前のフレームまでの間にTRACKEDの状態であれば、保存する
+                    prev_pairs = itertools.islice(queue, 0, len(queue) - 2)
+                    tracklet_saved = False
                     for prev in prev_pairs:
+                        if(tracklet_saved):
+                            break
                         for prev_tracklet in prev[1]:
                             if (
                                 prev_tracklet.id == tracklet.id
                                 and prev_tracklet.status.name == "TRACKED"
                             ):
                                 save_frame = True
+                                tracklet_saved = True
                                 save_track.append(tracklet)
+                                break
     if save_frame:
         save_path: str = path + "/" + str(save_num).zfill(3)
         image_path = save_path + ".jpg"
         cv2.imwrite(image_path, queue[-1][0])
-        annotation: str = tracklets_to_annotation(queue[-1][1])
+        annotation: str = tracklets_to_annotation(save_track)
         annotation_path = save_path + ".txt"
         with open(annotation_path, "w") as file:
             file.write(annotation)
@@ -88,7 +98,7 @@ def main() -> None:
         "-f",
         "--fps",
         help="Camera frame fps. This should be smaller than nn inference fps",
-        default=10,
+        default=8,
         type=int,
     )
     parser.add_argument(
@@ -122,9 +132,9 @@ def main() -> None:
             oakd_tracking_yolo.display_frame("nn", frame, tracklets)
             track_pair = (frame, tracklets)
             track_queue.append(track_pair)
-            while(len(track_queue) > QUEUE_SIZE):
+            while len(track_queue) > QUEUE_SIZE:
                 track_queue.popleft()
-            save_lost_frame(track_queue, path=path)
+            save_lost_frame(track_queue, path=path, save_tracked=True)
         if cv2.waitKey(1) == ord("q"):
             break
 
