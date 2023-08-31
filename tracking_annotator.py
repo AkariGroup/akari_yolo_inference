@@ -38,42 +38,46 @@ def save_lost_frame(queue, path: str, save_tracked: bool = True) -> None:
         return
     save_frame: bool = False
     save_track = []
-    for tracklet in queue[-2][1]:
-        if tracklet.status.name == "TRACKED":
-            if save_tracked:
-                save_track.append(tracklet)
-        elif tracklet.status.name == "LOST":
-            # LOSTの場合は最新のフレームがTRACKEDに復帰しているか見る
-            for now_tracklet in queue[-1][1]:
-                if (
-                    now_tracklet.id == tracklet.id
-                    and now_tracklet.status.name == "TRACKED"
-                ):
-                    # フレーム頭から2個前のフレームまでの間にTRACKEDの状態であれば、保存する
-                    prev_pairs = itertools.islice(queue, 0, len(queue) - 2)
-                    tracklet_saved = False
-                    for prev in prev_pairs:
-                        if(tracklet_saved):
-                            break
-                        for prev_tracklet in prev[1]:
-                            if (
-                                prev_tracklet.id == tracklet.id
-                                and prev_tracklet.status.name == "TRACKED"
-                            ):
-                                save_frame = True
-                                tracklet_saved = True
-                                save_track.append(tracklet)
-                                break
-    if save_frame:
-        save_path: str = path + "/" + str(save_num).zfill(3)
-        image_path = save_path + ".jpg"
-        cv2.imwrite(image_path, queue[-1][0])
-        annotation: str = tracklets_to_annotation(save_track)
-        annotation_path = save_path + ".txt"
-        with open(annotation_path, "w") as file:
-            file.write(annotation)
-        print(f"save {str(save_num).zfill(3)}")
-        save_num += 1
+    if queue[-2][1] is not None:
+        for tracklet in queue[-2][1]:
+            if tracklet.status.name == "TRACKED":
+                if save_tracked:
+                    save_track.append(tracklet)
+            elif tracklet.status.name == "LOST":
+                # LOSTの場合は最新のフレームがTRACKEDに復帰しているか見る
+                if queue[-1][1] is not None:
+                    for now_tracklet in queue[-1][1]:
+                        if (
+                            now_tracklet.id == tracklet.id
+                            and now_tracklet.status.name == "TRACKED"
+                        ):
+                            # フレーム頭から2個前のフレームまでの間にTRACKEDの状態であれば、保存する
+                            prev_pairs = itertools.islice(queue, 0, len(queue) - 2)
+                            tracklet_saved = False
+                            for prev in prev_pairs:
+                                if(tracklet_saved):
+                                    break
+                                if prev[1] is None:
+                                    continue
+                                for prev_tracklet in prev[1]:
+                                    if (
+                                        prev_tracklet.id == tracklet.id
+                                        and prev_tracklet.status.name == "TRACKED"
+                                    ):
+                                        save_frame = True
+                                        tracklet_saved = True
+                                        save_track.append(tracklet)
+                                        break
+        if save_frame:
+            save_path: str = path + "/" + str(save_num).zfill(3)
+            image_path = save_path + ".jpg"
+            cv2.imwrite(image_path, queue[-1][0])
+            annotation: str = tracklets_to_annotation(save_track)
+            annotation_path = save_path + ".txt"
+            with open(annotation_path, "w") as file:
+                file.write(annotation)
+            print(f"save {str(save_num).zfill(3)}")
+            save_num += 1
 
 
 def main() -> None:
