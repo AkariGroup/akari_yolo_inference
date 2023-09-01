@@ -6,7 +6,6 @@ from typing import Any
 import cv2
 import numpy
 import numpy as np
-
 from oakd_yolo.oakd_tracking_yolo import OakdTrackingYolo
 
 # OAK-D LITEの視野角
