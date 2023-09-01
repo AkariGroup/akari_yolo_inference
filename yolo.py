@@ -3,7 +3,6 @@ import argparse
 
 import cv2
 import numpy as np
-
 from oakd_yolo.oakd_yolo import OakdYolo
 
 

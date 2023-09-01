@@ -81,7 +81,7 @@ class OakdYolo(object):
         ctrl.setBrightness(brightness)
         self.qControl.send(ctrl)
 
-    def get_labels(self):
+    def get_labels(self) -> List[str]:
         return self.labels
 
     def _create_pipeline(self) -> dai.Pipeline:
@@ -178,7 +178,8 @@ class OakdYolo(object):
             )
             for detection in detections:
                 bbox = self.frame_norm(
-                    frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax)
+                    frame,
+                    (detection.xmin, detection.ymin, detection.xmax, detection.ymax),
                 )
                 cv2.putText(
                     frame,
@@ -196,10 +197,14 @@ class OakdYolo(object):
                     0.5,
                     255,
                 )
-                cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
+                cv2.rectangle(
+                    frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2
+                )
             cv2.putText(
                 frame,
-                "NN fps: {:.2f}".format(self.counter / (time.monotonic() - self.startTime)),
+                "NN fps: {:.2f}".format(
+                    self.counter / (time.monotonic() - self.startTime)
+                ),
                 (2, frame.shape[0] - 4),
                 cv2.FONT_HERSHEY_TRIPLEX,
                 0.4,
