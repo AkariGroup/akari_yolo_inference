@@ -329,23 +329,31 @@ class OakdTrackingYolo(object):
                             f"ID: {[tracklet.id]}",
                             (x1 + 10, y1 + 45),
                         )
-                        self.text.put_text(frame, tracklet.status.name, (x1 + 10, y1 + 70))
+                        self.text.put_text(
+                            frame, tracklet.status.name, (x1 + 10, y1 + 70)
+                        )
 
                         self.text.rectangle(frame, (x1, y1), (x2, y2), tracklet.id)
                         if tracklet.spatialCoordinates.z != 0:
                             self.text.put_text(
                                 frame,
-                                "X: {:.2f} m".format(tracklet.spatialCoordinates.x / 1000),
+                                "X: {:.2f} m".format(
+                                    tracklet.spatialCoordinates.x / 1000
+                                ),
                                 (x1 + 10, y1 + 95),
                             )
                             self.text.put_text(
                                 frame,
-                                "Y: {:.2f} m".format(tracklet.spatialCoordinates.y / 1000),
+                                "Y: {:.2f} m".format(
+                                    tracklet.spatialCoordinates.y / 1000
+                                ),
                                 (x1 + 10, y1 + 120),
                             )
                             self.text.put_text(
                                 frame,
-                                "Z: {:.2f} m".format(tracklet.spatialCoordinates.z / 1000),
+                                "Z: {:.2f} m".format(
+                                    tracklet.spatialCoordinates.z / 1000
+                                ),
                                 (x1 + 10, y1 + 145),
                             )
             if birds:
@@ -425,69 +433,3 @@ class OakdTrackingYolo(object):
                         shift=0,
                     )
         cv2.imshow("birds", birds)
-
-    def tracklets_to_annotation(self, tracklets: Any):
-        annotation_text = ""
-        for tracklet in tracklets:
-            center_x: float = (
-                tracklet.roi.topLeft().x + tracklet.roi.bottomRight().x
-            ) / 2
-            center_y: float = (
-                tracklet.roi.topLeft().y + tracklet.roi.bottomRight().y
-            ) / 2
-            width: float = tracklet.roi.bottomRight().x - tracklet.roi.topLeft().x
-            height: float = tracklet.roi.bottomRight().y - tracklet.roi.topLeft().y
-            annotation_text += (
-                f"{tracklet.label} {center_x} {center_y} {width} {height}\n"
-            )
-        return annotation_text
-
-    def save_lost_frame(
-        self, queue: Any, path: str, name: str, save_tracked: bool = True
-    ) -> bool:
-        global save_num
-        if len(queue) <= 2:
-            return
-        save_frame: bool = False
-        save_track = []
-        if queue[-2][1] is not None:
-            for tracklet in queue[-2][1]:
-                if tracklet.status.name == "TRACKED":
-                    if save_tracked:
-                        save_track.append(tracklet)
-                elif tracklet.status.name == "LOST":
-                    # LOSTの場合は最新のフレームがTRACKEDに復帰しているか見る
-                    if queue[-1][1] is not None:
-                        for now_tracklet in queue[-1][1]:
-                            if (
-                                now_tracklet.id == tracklet.id
-                                and now_tracklet.status.name == "TRACKED"
-                            ):
-                                # フレーム頭から2個前のフレームまでの間にTRACKEDの状態であれば、保存する
-                                prev_pairs = itertools.islice(queue, 0, len(queue) - 2)
-                                tracklet_saved = False
-                                for prev in prev_pairs:
-                                    if tracklet_saved:
-                                        break
-                                    if prev[1] is None:
-                                        continue
-                                    for prev_tracklet in prev[1]:
-                                        if (
-                                            prev_tracklet.id == tracklet.id
-                                            and prev_tracklet.status.name == "TRACKED"
-                                        ):
-                                            save_frame = True
-                                            tracklet_saved = True
-                                            save_track.append(tracklet)
-                                            break
-            if save_frame:
-                save_path: str = path + "/" + name
-                image_path = save_path + ".jpg"
-                cv2.imwrite(image_path, queue[-1][0])
-                annotation: str = self.tracklets_to_annotation(save_track)
-                annotation_path = save_path + ".txt"
-                with open(annotation_path, "w") as file:
-                    file.write(annotation)
-                print(f"Saved. name: {name}")
-                return True
-        return False
