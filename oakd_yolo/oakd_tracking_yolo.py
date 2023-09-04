@@ -53,7 +53,7 @@ class HostSync(object):
         remove = []
         for name in self.dict:
             remove.append(name)
-            if len(self.dict[name]) == 3:
+            if len(self.dict[name]) == 4:
                 ret = self.dict[name]
                 for rm in remove:
                     del self.dict[rm]
@@ -123,6 +123,7 @@ class OakdTrackingYolo(object):
         # Output queues will be used to get the rgb frames and nn data from the outputs defined above
         self.qRgb = self._device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
         self.qDet = self._device.getOutputQueue(name="nn", maxSize=4, blocking=False)
+        self.qRaw = self._device.getOutputQueue(name="raw", maxSize=4, blocking=False)
         self.qDepth = self._device.getOutputQueue(
             name="depth", maxSize=4, blocking=False
         )
@@ -139,6 +140,7 @@ class OakdTrackingYolo(object):
         self.sync = HostSync()
         self.track = None
         self.bird_eye_frame = self.create_bird_frame()
+        self.raw_frame = None
 
     def get_labels(self):
         return self.labels
@@ -230,6 +232,9 @@ class OakdTrackingYolo(object):
 
         xoutDepth = pipeline.create(dai.node.XLinkOut)
         xoutDepth.setStreamName("depth")
+        xoutRaw = pipeline.create(dai.node.XLinkOut)
+        xoutRaw.setStreamName("raw")
+        camRgb.video.link(xoutRaw.input)
         spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
         spatialDetectionNetwork.passthrough.link(objectTracker.inputTrackerFrame)
         spatialDetectionNetwork.passthrough.link(objectTracker.inputDetectionFrame)
@@ -250,6 +255,8 @@ class OakdTrackingYolo(object):
             self.sync.add_msg("rgb", self.qRgb.get())
         if self.qDepth.has():
             self.sync.add_msg("depth", self.qDepth.get())
+        if self.qRaw.has():
+            self.sync.add_msg("raw", self.qRaw.get())
         if self.qDet.has():
             self.sync.add_msg("detections", self.qDet.get())
             self.counter += 1
@@ -261,6 +268,7 @@ class OakdTrackingYolo(object):
             detections = msgs["detections"].detections
             frame = msgs["rgb"].getCvFrame()
             depthFrame = msgs["depth"].getFrame()
+            self.raw_frame = msgs["raw"].getCvFrame()
             depthFrameColor = cv2.normalize(
                 depthFrame, None, 256, 0, cv2.NORM_INF, cv2.CV_8UC3
             )
@@ -296,6 +304,9 @@ class OakdTrackingYolo(object):
                     )
                     tracklet.roi.height = tracklet.roi.height * width / height
         return frame, detections, tracklets
+
+    def get_raw_frame(self) -> np.ndarray:
+        return self.raw_frame
 
     def display_frame(
         self, name: str, frame: np.ndarray, tracklets: List[Any], birds: bool = True

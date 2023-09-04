@@ -51,7 +51,7 @@ class HostSync(object):
         remove = []
         for name in self.dict:
             remove.append(name)
-            if len(self.dict[name]) == 3:
+            if len(self.dict[name]) == 4:
                 ret = self.dict[name]
                 for rm in remove:
                     del self.dict[rm]
@@ -121,6 +121,7 @@ class OakdSpatialYolo(object):
         # Output queues will be used to get the rgb frames and nn data from the outputs defined above
         self.qRgb = self._device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
         self.qDet = self._device.getOutputQueue(name="nn", maxSize=4, blocking=False)
+        self.qRaw = self._device.getOutputQueue(name="raw", maxSize=4, blocking=False)
         self.qDepth = self._device.getOutputQueue(
             name="depth", maxSize=4, blocking=False
         )
@@ -133,6 +134,7 @@ class OakdSpatialYolo(object):
         self.text = TextHelper()
         self.sync = HostSync()
         self.bird_eye_frame = self.create_bird_frame()
+        self.raw_frame = None
 
     def get_labels(self):
         return self.labels
@@ -210,6 +212,10 @@ class OakdSpatialYolo(object):
         xoutNN.setStreamName("nn")
         spatialDetectionNetwork.out.link(xoutNN.input)
 
+        xoutRaw = pipeline.create(dai.node.XLinkOut)
+        xoutRaw.setStreamName("raw")
+        camRgb.video.link(xoutRaw.input)
+
         xoutDepth = pipeline.create(dai.node.XLinkOut)
         xoutDepth.setStreamName("depth")
         spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
@@ -227,6 +233,8 @@ class OakdSpatialYolo(object):
             self.sync.add_msg("rgb", self.qRgb.get())
         if self.qDepth.has():
             self.sync.add_msg("depth", self.qDepth.get())
+        if self.qRaw.has():
+            self.sync.add_msg("raw", self.qRaw.get())
         if self.qDet.has():
             self.sync.add_msg("detections", self.qDet.get())
             self.counter += 1
@@ -235,6 +243,7 @@ class OakdSpatialYolo(object):
             detections = msgs["detections"].detections
             frame = msgs["rgb"].getCvFrame()
             depthFrame = msgs["depth"].getFrame()
+            self.raw_frame = msgs["raw"].getCvFrame()
             depthFrameColor = cv2.normalize(
                 depthFrame, None, 256, 0, cv2.NORM_INF, cv2.CV_8UC3
             )
@@ -262,6 +271,9 @@ class OakdSpatialYolo(object):
                     brank_height / 2 / height
                 )
         return frame, detections
+
+    def get_raw_frame(self) -> np.ndarray:
+        return self.raw_frame
 
     def display_frame(
         self, name: str, frame: np.ndarray, detections: List[Any], birds: bool = True
