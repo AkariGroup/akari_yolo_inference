@@ -367,8 +367,6 @@ class OakdTrackingYolo(object):
                                 ),
                                 (x1 + 10, y1 + 145),
                             )
-            if birds:
-                self.draw_bird_frame(tracklets)
             cv2.putText(
                 frame,
                 "NN fps: {:.2f}".format(
@@ -381,6 +379,8 @@ class OakdTrackingYolo(object):
             )
             # Show the frame
             cv2.imshow(name, frame)
+            if birds:
+                self.draw_bird_frame(tracklets)
 
     def create_bird_frame(self) -> np.ndarray:
         fov = self.fov
