@@ -68,8 +68,8 @@ class OakdTrackingYolo(object):
         model_path: str,
         fps: int,
         fov: float,
-        track_targets: Optional[List[int]] = None,
         cam_debug: bool = False,
+        track_targets: Optional[List[int]] = None,
     ) -> None:
         if not Path(config_path).exists():
             raise ValueError("Path {} does not poetry exist!".format(config_path))
