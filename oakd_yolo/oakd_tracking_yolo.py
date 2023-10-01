@@ -7,7 +7,7 @@ import math
 import time
 from collections import deque
 from pathlib import Path
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import blobconverter
 import cv2
@@ -68,6 +68,7 @@ class OakdTrackingYolo(object):
         model_path: str,
         fps: int,
         fov: float,
+        track_targets: Optional[List[int]] = None,
         cam_debug: bool = False,
     ) -> None:
         if not Path(config_path).exists():
@@ -117,6 +118,7 @@ class OakdTrackingYolo(object):
         self.fps = fps
         self.fov = fov
         self.cam_debug = cam_debug
+        self.track_targets = track_targets
         self._stack = contextlib.ExitStack()
         self._pipeline = self._create_pipeline()
         self._device = self._stack.enter_context(dai.Device(self._pipeline))
@@ -213,8 +215,11 @@ class OakdTrackingYolo(object):
         spatialDetectionNetwork.setAnchorMasks(self.anchorMasks)
         spatialDetectionNetwork.setIouThreshold(self.iouThreshold)
         # トラッキングする物体のIDを配列で渡す。
-        # ここではconfigファイル内の全物体をトラッキング対象に指定
-        objectTracker.setDetectionLabelsToTrack(list(range(self.classes)))
+        # 指定がない場合はconfigファイル内の全物体をトラッキング対象に指定
+        if self.track_targets is None:
+            objectTracker.setDetectionLabelsToTrack(list(range(self.classes)))
+        else:
+            objectTracker.setDetectionLabelsToTrack(self.track_targets)
         # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
         objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
         # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
