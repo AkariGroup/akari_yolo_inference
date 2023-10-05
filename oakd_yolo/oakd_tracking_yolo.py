@@ -14,10 +14,36 @@ import cv2
 import depthai as dai
 import numpy as np
 
+from akari_client import AkariClient
+
 DISPLAY_WINDOW_SIZE_RATE = 2.0
 MAX_Z = 15000
 idColors = np.random.random(size=(256, 3)) * 256
 
+def convert_to_pos_from_akari(pos: Any, pitch: float, yaw: float) -> Any:
+    pitch = -1 * pitch
+    yaw = -1 * yaw
+    cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
+    arr_y = np.array(
+        [
+            [math.cos(yaw), 0, math.sin(yaw)],
+            [0, 1, 0],
+            [-math.sin(yaw), 0, math.cos(yaw)],
+        ]
+    )
+    arr_p = np.array(
+        [
+            [1, 0, 0],
+            [
+                0,
+                math.cos(pitch),
+                -math.sin(pitch),
+            ],
+            [0, math.sin(pitch), math.cos(pitch)],
+        ]
+    )
+    ans = arr_y @ arr_p @ cur_pos
+    return ans
 
 class TextHelper(object):
     def __init__(self) -> None:
@@ -42,9 +68,11 @@ class TextHelper(object):
 class HostSync(object):
     def __init__(self):
         self.dict = {}
+        self.head_seq = 0
 
-    def add_msg(self, name: str, msg: Any) -> None:
-        seq = str(msg.getSequenceNum())
+    def add_msg(self, name: str, msg: Any, seq: Optional[str]=None) -> None:
+        if seq is None:
+            seq = str(msg.getSequenceNum())
         if seq not in self.dict:
             self.dict[seq] = {}
         self.dict[seq][name] = msg
@@ -53,7 +81,7 @@ class HostSync(object):
         remove = []
         for name in self.dict:
             remove.append(name)
-            if len(self.dict[name]) == 4:
+            if len(self.dict[name]) == 5:
                 ret = self.dict[name]
                 for rm in remove:
                     del self.dict[rm]
@@ -88,6 +116,8 @@ class OakdTrackingYolo(object):
         )
         self.jet_custom = self.jet_custom[::-1]
         self.jet_custom[0] = [0, 0, 0]
+        self.akari = AkariClient()
+        self.joints = self.akari.joints
         # extract metadata
         metadata = nnConfig.get("NN_specific_metadata", {})
         self.classes = metadata.get("classes", {})
@@ -257,7 +287,9 @@ class OakdTrackingYolo(object):
         frame = None
         detections = []
         if self.qRgb.has():
-            self.sync.add_msg("rgb", self.qRgb.get())
+            rgb_mes = self.qRgb.get()
+            self.sync.add_msg("rgb", rgb_mes)
+            self.sync.add_msg("head_pos", self.joints.get_joint_positions(), str(rgb_mes.getSequenceNum()))
         if self.qDepth.has():
             self.sync.add_msg("depth", self.qDepth.get())
         if self.qRaw.has():
@@ -265,6 +297,7 @@ class OakdTrackingYolo(object):
         if self.qDet.has():
             self.sync.add_msg("detections", self.qDet.get())
             self.counter += 1
+        self.counter += 1
         if self.qTrack.has():
             self.track = self.qTrack.get()
         msgs = self.sync.get_msgs()
@@ -274,6 +307,7 @@ class OakdTrackingYolo(object):
             frame = msgs["rgb"].getCvFrame()
             depthFrame = msgs["depth"].getFrame()
             self.raw_frame = msgs["raw"].getCvFrame()
+            self.pos = msgs["head_pos"]
             depthFrameColor = cv2.normalize(
                 depthFrame, None, 256, 0, cv2.NORM_INF, cv2.CV_8UC3
             )
@@ -308,6 +342,13 @@ class OakdTrackingYolo(object):
                         brank_height / 2 / height
                     )
                     tracklet.roi.height = tracklet.roi.height * width / height
+            for tracklet in tracklets:
+                converted_pos = convert_to_pos_from_akari(
+                    tracklet.spatialCoordinates, self.pos['tilt'], self.pos['pan']
+                )
+                tracklet.spatialCoordinates.x = converted_pos[0][0]
+                tracklet.spatialCoordinates.y = converted_pos[1][0]
+                tracklet.spatialCoordinates.z = converted_pos[2][0]
         return frame, detections, tracklets
 
     def get_raw_frame(self) -> np.ndarray:
