@@ -5,7 +5,7 @@ import json
 import math
 import time
 from pathlib import Path
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import blobconverter
 import cv2
@@ -24,7 +24,7 @@ class TextHelper(object):
         self.text_type = cv2.FONT_HERSHEY_SIMPLEX
         self.line_type = cv2.LINE_AA
 
-    def put_text(self, frame: np.ndarray, text: str, coords: Tuple[float]) -> None:
+    def put_text(self, frame: np.ndarray, text: str, coords: Tuple[int, int]) -> None:
         cv2.putText(
             frame, text, coords, self.text_type, 0.8, self.bg_color, 3, self.line_type
         )
@@ -32,17 +32,22 @@ class TextHelper(object):
             frame, text, coords, self.text_type, 0.8, self.color, 1, self.line_type
         )
 
-    def rectangle(self, frame: np.ndarray, p1: Tuple[float], p2: Tuple[float], id: int):
+    def rectangle(
+        self, frame: np.ndarray, p1: Tuple[float], p2: Tuple[float], id: int
+    ) -> None:
         cv2.rectangle(frame, p1, p2, (0, 0, 0), 4)
         cv2.rectangle(frame, p1, p2, idColors[id], 2)
 
 
 class HostSync(object):
-    def __init__(self):
+    def __init__(self, sync_size: int = 4):
         self.dict = {}
+        self.head_seq = 0
+        self.sync_size = sync_size
 
-    def add_msg(self, name: str, msg: Any) -> None:
-        seq = str(msg.getSequenceNum())
+    def add_msg(self, name: str, msg: Any, seq: Optional[str] = None) -> None:
+        if seq is None:
+            seq = str(msg.getSequenceNum())
         if seq not in self.dict:
             self.dict[seq] = {}
         self.dict[seq][name] = msg
@@ -51,7 +56,7 @@ class HostSync(object):
         remove = []
         for name in self.dict:
             remove.append(name)
-            if len(self.dict[name]) == 4:
+            if len(self.dict[name]) == self.sync_size:
                 ret = self.dict[name]
                 for rm in remove:
                     del self.dict[rm]
@@ -67,6 +72,7 @@ class OakdSpatialYolo(object):
         fps: int,
         fov: float,
         cam_debug: bool = False,
+        robot_coordinate: bool = False,
     ) -> None:
         if not Path(config_path).exists():
             raise ValueError("Path {} does not poetry exist!".format(config_path))
@@ -115,6 +121,7 @@ class OakdSpatialYolo(object):
         self.fps = fps
         self.fov = fov
         self.cam_debug = cam_debug
+        self.robot_coordinate = robot_coordinate
         self._stack = contextlib.ExitStack()
         self._pipeline = self._create_pipeline()
         self._device = self._stack.enter_context(dai.Device(self._pipeline))
@@ -132,9 +139,41 @@ class OakdSpatialYolo(object):
         self.path = ""
         self.num = 0
         self.text = TextHelper()
-        self.sync = HostSync()
+        if self.robot_coordinate:
+            from akari_client import AkariClient
+
+            self.akari = AkariClient()
+            self.joints = self.akari.joints
+            self.sync = HostSync(5)
+        else:
+            self.sync = HostSync(4)
         self.bird_eye_frame = self.create_bird_frame()
         self.raw_frame = None
+
+    def convert_to_pos_from_akari(self, pos: Any, pitch: float, yaw: float) -> Any:
+        pitch = -1 * pitch
+        yaw = -1 * yaw
+        cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
+        arr_y = np.array(
+            [
+                [math.cos(yaw), 0, math.sin(yaw)],
+                [0, 1, 0],
+                [-math.sin(yaw), 0, math.cos(yaw)],
+            ]
+        )
+        arr_p = np.array(
+            [
+                [1, 0, 0],
+                [
+                    0,
+                    math.cos(pitch),
+                    -math.sin(pitch),
+                ],
+                [0, math.sin(pitch), math.cos(pitch)],
+            ]
+        )
+        ans = arr_y @ arr_p @ cur_pos
+        return ans
 
     def get_labels(self):
         return self.labels
@@ -168,7 +207,7 @@ class OakdSpatialYolo(object):
             lensPosition = calibData.getLensPosition(dai.CameraBoardSocket.CAM_A)
             if lensPosition:
                 camRgb.initialControl.setManualFocus(lensPosition)
-        except:
+        except BaseException:
             raise
         # Use ImageMqnip to resize with letterboxing
         manip = pipeline.create(dai.node.ImageManip)
@@ -230,7 +269,14 @@ class OakdSpatialYolo(object):
         frame = None
         detections = []
         if self.qRgb.has():
-            self.sync.add_msg("rgb", self.qRgb.get())
+            rgb_mes = self.qRgb.get()
+            self.sync.add_msg("rgb", rgb_mes)
+            if self.robot_coordinate:
+                self.sync.add_msg(
+                    "head_pos",
+                    self.joints.get_joint_positions(),
+                    str(rgb_mes.getSequenceNum()),
+                )
         if self.qDepth.has():
             self.sync.add_msg("depth", self.qDepth.get())
         if self.qRaw.has():
@@ -270,6 +316,15 @@ class OakdSpatialYolo(object):
                 detection.ymax = (width / height) * detection.ymax - (
                     brank_height / 2 / height
                 )
+            if self.robot_coordinate:
+                self.pos = msgs["head_pos"]
+                for detection in detections:
+                    converted_pos = self.convert_to_pos_from_akari(
+                        detection.spatialCoordinates, self.pos["tilt"], self.pos["pan"]
+                    )
+                    detection.spatialCoordinates.x = converted_pos[0][0]
+                    detection.spatialCoordinates.y = converted_pos[1][0]
+                    detection.spatialCoordinates.z = converted_pos[2][0]
         return frame, detections
 
     def get_raw_frame(self) -> np.ndarray:
@@ -303,7 +358,7 @@ class OakdSpatialYolo(object):
                 y2 = bbox[3]
                 try:
                     label = self.labels[detection.label]
-                except:
+                except BaseException:
                     label = detection.label
                 self.text.put_text(frame, str(label), (x1 + 10, y1 + 20))
                 self.text.put_text(
@@ -328,8 +383,6 @@ class OakdSpatialYolo(object):
                         "Z: {:.2f} m".format(detection.spatialCoordinates.z / 1000),
                         (x1 + 10, y1 + 140),
                     )
-            if birds:
-                self.draw_bird_frame(detections)
             cv2.putText(
                 frame,
                 "NN fps: {:.2f}".format(
@@ -342,6 +395,8 @@ class OakdSpatialYolo(object):
             )
             # Show the frame
             cv2.imshow(name, frame)
+            if birds:
+                self.draw_bird_frame(detections)
 
     def create_bird_frame(self) -> np.ndarray:
         fov = self.fov
@@ -366,7 +421,7 @@ class OakdSpatialYolo(object):
         cv2.fillPoly(frame, [fov_cnt], color=(70, 70, 70))
         return frame
 
-    def draw_bird_frame(self, detections: List[Any]) -> None:
+    def draw_bird_frame(self, detections: List[Any], show_labels: bool = False) -> None:
         birds = self.bird_eye_frame.copy()
         global MAX_Z
         max_x = MAX_Z / 2  # mm
@@ -385,8 +440,15 @@ class OakdSpatialYolo(object):
                 + birds.shape[1] / 2
             )
             if detections[i].label is not None:
-                # cv2.putText(frame, str(id), (pointX - 30, pointY + 5),
-                #           cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0))
+                if show_labels:
+                    cv2.putText(
+                        birds,
+                        self.labels[detections[i].label],
+                        (pointX - 30, pointY + 5),
+                        cv2.FONT_HERSHEY_TRIPLEX,
+                        0.5,
+                        (0, 255, 0),
+                    )
                 cv2.circle(
                     birds,
                     (pointX, pointY),

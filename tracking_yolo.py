@@ -77,40 +77,18 @@ def main() -> None:
     args = parser.parse_args()
 
     oakd_tracking_yolo = OakdTrackingYolo(
-        args.config, args.model, args.fps, fov, args.display_camera
+        config_path=args.config,
+        model_path=args.model,
+        fps=args.fps,
+        fov=fov,
+        cam_debug=args.display_camera,
+        robot_coordinate=args.robot_coordinate,
     )
-
-    if args.robot_coordinate:
-        from akari_client import AkariClient
-
-        akari = AkariClient()
-        joints = akari.joints
-    trackings = None
-
     while True:
         frame = None
         detections = []
         frame, detections, tracklets = oakd_tracking_yolo.get_frame()
-        if args.robot_coordinate:
-            head_pos = joints.get_joint_positions()
-            pitch = head_pos["tilt"]
-            yaw = head_pos["pan"]
         if frame is not None:
-            if args.robot_coordinate:
-                for detection in detections:
-                    converted_pos = convert_to_pos_from_akari(
-                        detection.spatialCoordinates, pitch, yaw
-                    )
-                    detection.spatialCoordinates.x = converted_pos[0][0]
-                    detection.spatialCoordinates.y = converted_pos[1][0]
-                    detection.spatialCoordinates.z = converted_pos[2][0]
-                for tracklet in tracklets:
-                    converted_pos = convert_to_pos_from_akari(
-                        tracklet.spatialCoordinates, pitch, yaw
-                    )
-                    tracklet.spatialCoordinates.x = converted_pos[0][0]
-                    tracklet.spatialCoordinates.y = converted_pos[1][0]
-                    tracklet.spatialCoordinates.z = converted_pos[2][0]
             oakd_tracking_yolo.display_frame("nn", frame, tracklets)
         if cv2.waitKey(1) == ord("q"):
             break

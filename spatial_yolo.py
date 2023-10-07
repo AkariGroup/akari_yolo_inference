@@ -72,33 +72,18 @@ def main() -> None:
         action="store_true",
     )
     args = parser.parse_args()
-
     oakd_spatial_yolo = OakdSpatialYolo(
-        args.config, args.model, args.fps, fov, args.display_camera
+        config_path=args.config,
+        model_path=args.model,
+        fps=args.fps,
+        fov=fov,
+        cam_debug=args.display_camera,
+        robot_coordinate=args.robot_coordinate,
     )
-
-    if args.robot_coordinate:
-        from akari_client import AkariClient
-
-        akari = AkariClient()
-        joints = akari.joints
-
     while True:
         frame = None
         detections = []
         frame, detections = oakd_spatial_yolo.get_frame()
-        if args.robot_coordinate:
-            head_pos = joints.get_joint_positions()
-            pitch = head_pos["tilt"]
-            yaw = head_pos["pan"]
-        for detection in detections:
-            if args.robot_coordinate:
-                converted_pos = convert_to_pos_from_akari(
-                    detection.spatialCoordinates, -1 * pitch, -1 * yaw
-                )
-                detection.spatialCoordinates.x = converted_pos[0][0]
-                detection.spatialCoordinates.y = converted_pos[1][0]
-                detection.spatialCoordinates.z = converted_pos[2][0]
         oakd_spatial_yolo.display_frame("nn", frame, detections)
         if cv2.waitKey(1) == ord("q"):
             break
