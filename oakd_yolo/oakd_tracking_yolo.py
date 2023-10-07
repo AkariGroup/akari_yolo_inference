@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
 import contextlib
-import itertools
 import json
 import math
 import time
-from collections import deque
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Union
 
@@ -14,36 +12,10 @@ import cv2
 import depthai as dai
 import numpy as np
 
-from akari_client import AkariClient
-
 DISPLAY_WINDOW_SIZE_RATE = 2.0
 MAX_Z = 15000
 idColors = np.random.random(size=(256, 3)) * 256
 
-def convert_to_pos_from_akari(pos: Any, pitch: float, yaw: float) -> Any:
-    pitch = -1 * pitch
-    yaw = -1 * yaw
-    cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
-    arr_y = np.array(
-        [
-            [math.cos(yaw), 0, math.sin(yaw)],
-            [0, 1, 0],
-            [-math.sin(yaw), 0, math.cos(yaw)],
-        ]
-    )
-    arr_p = np.array(
-        [
-            [1, 0, 0],
-            [
-                0,
-                math.cos(pitch),
-                -math.sin(pitch),
-            ],
-            [0, math.sin(pitch), math.cos(pitch)],
-        ]
-    )
-    ans = arr_y @ arr_p @ cur_pos
-    return ans
 
 class TextHelper(object):
     def __init__(self) -> None:
@@ -52,7 +24,7 @@ class TextHelper(object):
         self.text_type = cv2.FONT_HERSHEY_SIMPLEX
         self.line_type = cv2.LINE_AA
 
-    def put_text(self, frame: np.ndarray, text: str, coords: Tuple[float]) -> None:
+    def put_text(self, frame: np.ndarray, text: str, coords: Tuple[int, int]) -> None:
         cv2.putText(
             frame, text, coords, self.text_type, 0.8, self.bg_color, 3, self.line_type
         )
@@ -60,17 +32,20 @@ class TextHelper(object):
             frame, text, coords, self.text_type, 0.8, self.color, 1, self.line_type
         )
 
-    def rectangle(self, frame: np.ndarray, p1: Tuple[float], p2: Tuple[float], id: int):
+    def rectangle(
+        self, frame: np.ndarray, p1: Tuple[float], p2: Tuple[float], id: int
+    ) -> None:
         cv2.rectangle(frame, p1, p2, (0, 0, 0), 4)
         cv2.rectangle(frame, p1, p2, idColors[id], 2)
 
 
 class HostSync(object):
-    def __init__(self):
+    def __init__(self, sync_size: int = 4):
         self.dict = {}
         self.head_seq = 0
+        self.sync_size = sync_size
 
-    def add_msg(self, name: str, msg: Any, seq: Optional[str]=None) -> None:
+    def add_msg(self, name: str, msg: Any, seq: Optional[str] = None) -> None:
         if seq is None:
             seq = str(msg.getSequenceNum())
         if seq not in self.dict:
@@ -81,7 +56,7 @@ class HostSync(object):
         remove = []
         for name in self.dict:
             remove.append(name)
-            if len(self.dict[name]) == 5:
+            if len(self.dict[name]) == self.sync_size:
                 ret = self.dict[name]
                 for rm in remove:
                     del self.dict[rm]
@@ -97,6 +72,7 @@ class OakdTrackingYolo(object):
         fps: int,
         fov: float,
         cam_debug: bool = False,
+        robot_coordinate: bool = False,
         track_targets: Optional[List[int]] = None,
     ) -> None:
         if not Path(config_path).exists():
@@ -116,8 +92,6 @@ class OakdTrackingYolo(object):
         )
         self.jet_custom = self.jet_custom[::-1]
         self.jet_custom[0] = [0, 0, 0]
-        self.akari = AkariClient()
-        self.joints = self.akari.joints
         # extract metadata
         metadata = nnConfig.get("NN_specific_metadata", {})
         self.classes = metadata.get("classes", {})
@@ -149,10 +123,10 @@ class OakdTrackingYolo(object):
         self.fov = fov
         self.cam_debug = cam_debug
         self.track_targets = track_targets
+        self.robot_coordinate = robot_coordinate
         self._stack = contextlib.ExitStack()
         self._pipeline = self._create_pipeline()
         self._device = self._stack.enter_context(dai.Device(self._pipeline))
-        # Output queues will be used to get the rgb frames and nn data from the outputs defined above
         self.qRgb = self._device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
         self.qDet = self._device.getOutputQueue(name="nn", maxSize=4, blocking=False)
         self.qRaw = self._device.getOutputQueue(name="raw", maxSize=4, blocking=False)
@@ -169,12 +143,44 @@ class OakdTrackingYolo(object):
         self.path = ""
         self.num = 0
         self.text = TextHelper()
-        self.sync = HostSync()
+        if self.robot_coordinate:
+            from akari_client import AkariClient
+
+            self.akari = AkariClient()
+            self.joints = self.akari.joints
+            self.sync = HostSync(5)
+        else:
+            self.sync = HostSync(4)
         self.track = None
         self.bird_eye_frame = self.create_bird_frame()
         self.raw_frame = None
 
-    def get_labels(self):
+    def convert_to_pos_from_akari(self, pos: Any, pitch: float, yaw: float) -> Any:
+        pitch = -1 * pitch
+        yaw = -1 * yaw
+        cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
+        arr_y = np.array(
+            [
+                [math.cos(yaw), 0, math.sin(yaw)],
+                [0, 1, 0],
+                [-math.sin(yaw), 0, math.cos(yaw)],
+            ]
+        )
+        arr_p = np.array(
+            [
+                [1, 0, 0],
+                [
+                    0,
+                    math.cos(pitch),
+                    -math.sin(pitch),
+                ],
+                [0, math.sin(pitch), math.cos(pitch)],
+            ]
+        )
+        ans = arr_y @ arr_p @ cur_pos
+        return ans
+
+    def get_labels(self) -> None:
         return self.labels
 
     def _create_pipeline(self) -> dai.Pipeline:
@@ -209,7 +215,7 @@ class OakdTrackingYolo(object):
             lensPosition = calibData.getLensPosition(dai.CameraBoardSocket.CAM_A)
             if lensPosition:
                 camRgb.initialControl.setManualFocus(lensPosition)
-        except:
+        except BaseException:
             raise
         # Use ImageMqnip to resize with letterboxing
         manip = pipeline.create(dai.node.ImageManip)
@@ -289,7 +295,12 @@ class OakdTrackingYolo(object):
         if self.qRgb.has():
             rgb_mes = self.qRgb.get()
             self.sync.add_msg("rgb", rgb_mes)
-            self.sync.add_msg("head_pos", self.joints.get_joint_positions(), str(rgb_mes.getSequenceNum()))
+            if self.robot_coordinate:
+                self.sync.add_msg(
+                    "head_pos",
+                    self.joints.get_joint_positions(),
+                    str(rgb_mes.getSequenceNum()),
+                )
         if self.qDepth.has():
             self.sync.add_msg("depth", self.qDepth.get())
         if self.qRaw.has():
@@ -307,7 +318,6 @@ class OakdTrackingYolo(object):
             frame = msgs["rgb"].getCvFrame()
             depthFrame = msgs["depth"].getFrame()
             self.raw_frame = msgs["raw"].getCvFrame()
-            self.pos = msgs["head_pos"]
             depthFrameColor = cv2.normalize(
                 depthFrame, None, 256, 0, cv2.NORM_INF, cv2.CV_8UC3
             )
@@ -342,13 +352,23 @@ class OakdTrackingYolo(object):
                         brank_height / 2 / height
                     )
                     tracklet.roi.height = tracklet.roi.height * width / height
-            for tracklet in tracklets:
-                converted_pos = convert_to_pos_from_akari(
-                    tracklet.spatialCoordinates, self.pos['tilt'], self.pos['pan']
-                )
-                tracklet.spatialCoordinates.x = converted_pos[0][0]
-                tracklet.spatialCoordinates.y = converted_pos[1][0]
-                tracklet.spatialCoordinates.z = converted_pos[2][0]
+
+            if self.robot_coordinate:
+                self.pos = msgs["head_pos"]
+                for detection in detections:
+                    converted_pos = self.convert_to_pos_from_akari(
+                        detection.spatialCoordinates, self.pos["tilt"], self.pos["pan"]
+                    )
+                    detection.spatialCoordinates.x = converted_pos[0][0]
+                    detection.spatialCoordinates.y = converted_pos[1][0]
+                    detection.spatialCoordinates.z = converted_pos[2][0]
+                for tracklet in tracklets:
+                    converted_pos = self.convert_to_pos_from_akari(
+                        tracklet.spatialCoordinates, self.pos["tilt"], self.pos["pan"]
+                    )
+                    tracklet.spatialCoordinates.x = converted_pos[0][0]
+                    tracklet.spatialCoordinates.y = converted_pos[1][0]
+                    tracklet.spatialCoordinates.z = converted_pos[2][0]
         return frame, detections, tracklets
 
     def get_raw_frame(self) -> np.ndarray:
@@ -365,9 +385,6 @@ class OakdTrackingYolo(object):
                     int(frame.shape[0] * DISPLAY_WINDOW_SIZE_RATE),
                 ),
             )
-            height = int(frame.shape[1] * 9 / 16)
-            width = frame.shape[1]
-            brank_height = width - height
             if tracklets is not None:
                 for tracklet in tracklets:
                     if tracklet.status.name == "TRACKED":
@@ -378,7 +395,7 @@ class OakdTrackingYolo(object):
                         y2 = int(roi.bottomRight().y)
                         try:
                             label = self.labels[tracklet.label]
-                        except:
+                        except Exception:
                             label = tracklet.label
                         self.text.put_text(frame, str(label), (x1 + 10, y1 + 20))
                         self.text.put_text(
