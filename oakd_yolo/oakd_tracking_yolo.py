@@ -285,21 +285,6 @@ class OakdTrackingYolo(object):
         objectTracker.out.link(trackerOut.input)
         return pipeline
 
-    def reboot(self) -> None:
-        self.close()
-        self._stack = contextlib.ExitStack()
-        self._pipeline = self._create_pipeline()
-        self._device = self._stack.enter_context(dai.Device(self._pipeline))
-        self.qRgb = self._device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
-        self.qDet = self._device.getOutputQueue(name="nn", maxSize=4, blocking=False)
-        self.qRaw = self._device.getOutputQueue(name="raw", maxSize=4, blocking=False)
-        self.qDepth = self._device.getOutputQueue(
-            name="depth", maxSize=4, blocking=False
-        )
-        self.qTrack = self._device.getOutputQueue(
-            "tracklets", maxSize=4, blocking=False
-        )
-
     def frame_norm(self, frame: np.ndarray, bbox: Tuple[float]) -> List[int]:
         normVals = np.full(len(bbox), frame.shape[0])
         normVals[::2] = frame.shape[1]
