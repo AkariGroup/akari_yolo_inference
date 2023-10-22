@@ -308,7 +308,6 @@ class OakdTrackingYolo(object):
         if self.qDet.has():
             self.sync.add_msg("detections", self.qDet.get())
             self.counter += 1
-        self.counter += 1
         if self.qTrack.has():
             self.track = self.qTrack.get()
         msgs = self.sync.get_msgs()
