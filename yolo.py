@@ -2,7 +2,6 @@
 import argparse
 
 import cv2
-import numpy as np
 from oakd_yolo.oakd_yolo import OakdYolo
 
 
@@ -31,15 +30,27 @@ def main() -> None:
         type=int,
     )
     args = parser.parse_args()
-    oakd_yolo = OakdYolo(args.config, args.model, args.fps)
-
-    while True:
-        frame = None
-        detections = []
-        frame, detections = oakd_yolo.get_frame()
-        oakd_yolo.display_frame("nn", frame, detections)
-        if cv2.waitKey(1) == ord("q"):
-            break
+    end = False
+    while not end:
+        oakd_yolo = OakdYolo(args.config, args.model, args.fps)
+        while True:
+            frame = None
+            detections = []
+            try:
+                frame, detections = oakd_yolo.get_frame()
+            except BaseException:
+                print("===================")
+                print("get_frame() error! Reboot OAK-D.")
+                print("If reboot occur frequently, Bandwidth may be too much.")
+                print("Please lower FPS.")
+                print("==================")
+                break
+            if frame is not None:
+                oakd_yolo.display_frame("nn", frame, detections)
+            if cv2.waitKey(1) == ord("q"):
+                end = True
+                break
+        oakd_yolo.close()
 
 
 if __name__ == "__main__":

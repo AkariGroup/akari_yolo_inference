@@ -76,22 +76,34 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    oakd_tracking_yolo = OakdTrackingYolo(
-        config_path=args.config,
-        model_path=args.model,
-        fps=args.fps,
-        fov=fov,
-        cam_debug=args.display_camera,
-        robot_coordinate=args.robot_coordinate,
-    )
-    while True:
-        frame = None
-        detections = []
-        frame, detections, tracklets = oakd_tracking_yolo.get_frame()
-        if frame is not None:
-            oakd_tracking_yolo.display_frame("nn", frame, tracklets)
-        if cv2.waitKey(1) == ord("q"):
-            break
+    end = False
+    while not end:
+        oakd_tracking_yolo = OakdTrackingYolo(
+            config_path=args.config,
+            model_path=args.model,
+            fps=args.fps,
+            fov=fov,
+            cam_debug=args.display_camera,
+            robot_coordinate=args.robot_coordinate,
+        )
+        while True:
+            frame = None
+            detections = []
+            try:
+                frame, detections, tracklets = oakd_tracking_yolo.get_frame()
+            except BaseException:
+                print("===================")
+                print("get_frame() error! Reboot OAK-D.")
+                print("If reboot occur frequently, Bandwidth may be too much.")
+                print("Please lower FPS.")
+                print("==================")
+                break
+            if frame is not None:
+                oakd_tracking_yolo.display_frame("nn", frame, tracklets)
+            if cv2.waitKey(1) == ord("q"):
+                end =True
+                break
+        oakd_tracking_yolo.close()
 
 
 if __name__ == "__main__":

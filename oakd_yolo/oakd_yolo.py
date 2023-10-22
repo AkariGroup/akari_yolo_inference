@@ -76,6 +76,9 @@ class OakdYolo(object):
         self.num = 0
         self.counter = 0
 
+    def close(self) -> None:
+        self._device.close()
+
     def set_camera_brightness(self, brightness: int) -> None:
         ctrl = dai.CameraControl()
         ctrl.setBrightness(brightness)
@@ -140,10 +143,12 @@ class OakdYolo(object):
         return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
 
     def get_frame(self) -> Union[np.ndarray, List[Any]]:
-        inRgb = self.qRgb.get()
-        inIsp = self.qIsp.get()
-        inDet = self.qDet.get()
-
+        try:
+            inRgb = self.qRgb.get()
+            inIsp = self.qIsp.get()
+            inDet = self.qDet.get()
+        except BaseException:
+            raise
         if inIsp is not None:
             frame = inRgb.getCvFrame()
         if inDet is not None:
