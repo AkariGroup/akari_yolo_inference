@@ -264,7 +264,6 @@ class OakdTrackingYolo(object):
                 elif isinstance(target, str):
                     if target in self.labels:
                         target_list.append(self.labels.index(target))
-            print(target_list)
             objectTracker.setDetectionLabelsToTrack(target_list)
         # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
         objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
