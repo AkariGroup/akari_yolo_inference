@@ -2,7 +2,7 @@
 import argparse
 
 import cv2
-from oakd_yolo.oakd_yolo import OakdYolo
+from lib.akari_yolo_lib.oakd_yolo import OakdYolo
 
 
 def main() -> None:
