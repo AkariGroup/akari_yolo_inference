@@ -74,9 +74,20 @@ def main() -> None:
         help="Convert object pos from camera coordinate to robot coordinate",
         action="store_true",
     )
+    parser.add_argument(
+        "--spatial_frame",
+        help="Display spatial frame instead of bird frame",
+        action="store_true",
+    )
     args = parser.parse_args()
-
+    bird_frame = True
+    spatial_frame = False
+    # spatial_frameを有効化した場合、bird_frameは無効化
+    if args.spatial_frame:
+        bird_frame = False
+        spatial_frame = True
     end = False
+
     while not end:
         oakd_tracking_yolo = OakdTrackingYolo(
             config_path=args.config,
@@ -85,6 +96,8 @@ def main() -> None:
             fov=fov,
             cam_debug=args.display_camera,
             robot_coordinate=args.robot_coordinate,
+            show_bird_frame=bird_frame,
+            show_spatial_frame=spatial_frame,
         )
         while True:
             frame = None
@@ -101,7 +114,7 @@ def main() -> None:
             if frame is not None:
                 oakd_tracking_yolo.display_frame("nn", frame, tracklets)
             if cv2.waitKey(1) == ord("q"):
-                end =True
+                end = True
                 break
         oakd_tracking_yolo.close()
 
