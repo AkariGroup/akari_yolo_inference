@@ -12,32 +12,6 @@ from lib.akari_yolo_lib.oakd_tracking_yolo import OakdTrackingYolo
 fov = 56.7
 
 
-def convert_to_pos_from_akari(pos: Any, pitch: float, yaw: float) -> Any:
-    pitch = -1 * pitch
-    yaw = -1 * yaw
-    cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
-    arr_y = np.array(
-        [
-            [math.cos(yaw), 0, math.sin(yaw)],
-            [0, 1, 0],
-            [-math.sin(yaw), 0, math.cos(yaw)],
-        ]
-    )
-    arr_p = np.array(
-        [
-            [1, 0, 0],
-            [
-                0,
-                math.cos(pitch),
-                -math.sin(pitch),
-            ],
-            [0, math.sin(pitch), math.cos(pitch)],
-        ]
-    )
-    ans = arr_y @ arr_p @ cur_pos
-    return ans
-
-
 def main() -> None:
     # parse arguments
     parser = argparse.ArgumentParser()
@@ -79,6 +53,11 @@ def main() -> None:
         help="Display spatial frame instead of bird frame",
         action="store_true",
     )
+    parser.add_argument(
+        "--orbit",
+        help="Display tracked orbit on bird frame",
+        action="store_true",
+    )
     args = parser.parse_args()
     bird_frame = True
     spatial_frame = False
@@ -98,6 +77,7 @@ def main() -> None:
             robot_coordinate=args.robot_coordinate,
             show_bird_frame=bird_frame,
             show_spatial_frame=spatial_frame,
+            show_orbit=args.orbit
         )
         while True:
             frame = None
