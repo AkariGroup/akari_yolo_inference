@@ -58,6 +58,11 @@ def main() -> None:
         help="Display tracked orbit on bird frame",
         action="store_true",
     )
+    parser.add_argument(
+        "--log_path",
+        help="Path to save orbit data",
+        type=str,
+    )
     args = parser.parse_args()
     bird_frame = True
     spatial_frame = False
@@ -77,20 +82,21 @@ def main() -> None:
             robot_coordinate=args.robot_coordinate,
             show_bird_frame=bird_frame,
             show_spatial_frame=spatial_frame,
-            show_orbit=args.orbit
+            show_orbit=args.orbit,
+            log_path=args.log_path
         )
         while True:
             frame = None
             detections = []
-            try:
-                frame, detections, tracklets = oakd_tracking_yolo.get_frame()
-            except BaseException:
-                print("===================")
-                print("get_frame() error! Reboot OAK-D.")
-                print("If reboot occur frequently, Bandwidth may be too much.")
-                print("Please lower FPS.")
-                print("==================")
-                break
+            #try:
+            frame, detections, tracklets = oakd_tracking_yolo.get_frame()
+            #except BaseException:
+            #    print("===================")
+            #    print("get_frame() error! Reboot OAK-D.")
+            #    print("If reboot occur frequently, Bandwidth may be too much.")
+            #    print("Please lower FPS.")
+            #    print("==================")
+            #    break
             if frame is not None:
                 oakd_tracking_yolo.display_frame("nn", frame, tracklets)
             if cv2.waitKey(1) == ord("q"):
