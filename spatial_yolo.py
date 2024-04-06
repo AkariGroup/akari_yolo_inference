@@ -11,7 +11,7 @@ def main() -> None:
         "-m",
         "--model",
         help="Provide model name or model path for inference",
-        default="yolov7_tiny_coco_416x416",
+        default="yolov7tiny_coco_416x416",
         type=str,
     )
     parser.add_argument(
