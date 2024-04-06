@@ -11,14 +11,14 @@ def main() -> None:
         "-m",
         "--model",
         help="Provide model name or model path for inference",
-        default="yolov4_tiny_coco_416x416",
+        default="yolov7_tiny_coco_416x416",
         type=str,
     )
     parser.add_argument(
         "-c",
         "--config",
         help="Provide config path for inference",
-        default="json/yolov4-tiny.json",
+        default="json/yolov7tiny_coco_416x416.json",
         type=str,
     )
     parser.add_argument(
