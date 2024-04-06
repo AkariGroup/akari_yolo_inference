@@ -1,41 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-import math
-from typing import Any
-
 import cv2
-import numpy
-import numpy as np
 from lib.akari_yolo_lib.oakd_tracking_yolo import OakdTrackingYolo
-
-# OAK-D LITEの視野角
-fov = 56.7
-
-
-def convert_to_pos_from_akari(pos: Any, pitch: float, yaw: float) -> Any:
-    pitch = -1 * pitch
-    yaw = -1 * yaw
-    cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
-    arr_y = np.array(
-        [
-            [math.cos(yaw), 0, math.sin(yaw)],
-            [0, 1, 0],
-            [-math.sin(yaw), 0, math.cos(yaw)],
-        ]
-    )
-    arr_p = np.array(
-        [
-            [1, 0, 0],
-            [
-                0,
-                math.cos(pitch),
-                -math.sin(pitch),
-            ],
-            [0, math.sin(pitch), math.cos(pitch)],
-        ]
-    )
-    ans = arr_y @ arr_p @ cur_pos
-    return ans
 
 
 def main() -> None:
@@ -45,14 +11,14 @@ def main() -> None:
         "-m",
         "--model",
         help="Provide model name or model path for inference",
-        default="yolov4_tiny_coco_416x416",
+        default="yolov7tiny_coco_416x416",
         type=str,
     )
     parser.add_argument(
         "-c",
         "--config",
         help="Provide config path for inference",
-        default="json/yolov4-tiny.json",
+        default="json/yolov7tiny_coco_416x416.json",
         type=str,
     )
     parser.add_argument(
@@ -79,13 +45,27 @@ def main() -> None:
         help="Display spatial frame instead of bird frame",
         action="store_true",
     )
+    parser.add_argument(
+        "--disable_orbit",
+        help="Disable display tracked orbit on bird frame",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--log_path",
+        help="Path to save orbit data",
+        type=str,
+    )
     args = parser.parse_args()
     bird_frame = True
+    orbit = True
     spatial_frame = False
+    if args.disable_orbit:
+        orbit = False
     # spatial_frameを有効化した場合、bird_frameは無効化
     if args.spatial_frame:
         bird_frame = False
         spatial_frame = True
+        orbit = False
     end = False
 
     while not end:
@@ -93,12 +73,14 @@ def main() -> None:
             config_path=args.config,
             model_path=args.model,
             fps=args.fps,
-            fov=fov,
             cam_debug=args.display_camera,
             robot_coordinate=args.robot_coordinate,
             show_bird_frame=bird_frame,
             show_spatial_frame=spatial_frame,
+            show_orbit=orbit,
+            log_path=args.log_path,
         )
+        oakd_tracking_yolo.update_bird_frame_distance(10000)
         while True:
             frame = None
             detections = []

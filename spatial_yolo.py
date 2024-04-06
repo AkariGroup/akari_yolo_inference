@@ -1,38 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-import math
-from typing import Any
-
 import cv2
-import numpy
-import numpy as np
 from lib.akari_yolo_lib.oakd_spatial_yolo import OakdSpatialYolo
-
-fov = 56.7
-
-
-def convert_to_pos_from_akari(pos: Any, pitch: float, yaw: float) -> Any:
-    cur_pos = np.array([[pos.x], [pos.y], [pos.z]])
-    arr_y = np.array(
-        [
-            [math.cos(yaw), 0, math.sin(yaw)],
-            [0, 1, 0],
-            [-math.sin(yaw), 0, math.cos(yaw)],
-        ]
-    )
-    arr_p = np.array(
-        [
-            [1, 0, 0],
-            [
-                0,
-                math.cos(pitch),
-                -math.sin(pitch),
-            ],
-            [0, math.sin(pitch), math.cos(pitch)],
-        ]
-    )
-    ans = arr_y @ arr_p @ cur_pos
-    return ans
 
 
 def main() -> None:
@@ -42,14 +11,14 @@ def main() -> None:
         "-m",
         "--model",
         help="Provide model name or model path for inference",
-        default="yolov4_tiny_coco_416x416",
+        default="yolov7tiny_coco_416x416",
         type=str,
     )
     parser.add_argument(
         "-c",
         "--config",
         help="Provide config path for inference",
-        default="json/yolov4-tiny.json",
+        default="json/yolov7tiny_coco_416x416.json",
         type=str,
     )
     parser.add_argument(
@@ -79,7 +48,6 @@ def main() -> None:
             config_path=args.config,
             model_path=args.model,
             fps=args.fps,
-            fov=fov,
             cam_debug=args.display_camera,
             robot_coordinate=args.robot_coordinate,
         )
