@@ -55,6 +55,11 @@ def main() -> None:
         help="Path to save orbit data",
         type=str,
     )
+    parser.add_argument(
+        "--log_continue",
+        help="Continue log data",
+        action="store_true",
+    )
     args = parser.parse_args()
     bird_frame = True
     orbit = True
@@ -79,6 +84,7 @@ def main() -> None:
             show_spatial_frame=spatial_frame,
             show_orbit=orbit,
             log_path=args.log_path,
+            log_continue=args.log_continue
         )
         oakd_tracking_yolo.update_bird_frame_distance(10000)
         while True:
