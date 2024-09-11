@@ -56,11 +56,6 @@ def main() -> None:
         type=str,
     )
     parser.add_argument(
-        "--disable_log_filtering",
-        help="Display log pos filtering",
-        action="store_true",
-    )
-    parser.add_argument(
         "--log_continue",
         help="Continue log data",
         action="store_true",
@@ -69,7 +64,6 @@ def main() -> None:
     bird_frame = True
     orbit = True
     spatial_frame = False
-    log_filtering = True
     if args.disable_orbit:
         orbit = False
     # spatial_frameを有効化した場合、bird_frameは無効化
@@ -77,8 +71,6 @@ def main() -> None:
         bird_frame = False
         spatial_frame = True
         orbit = False
-    if args.disable_log_filtering:
-        log_filtering = False
     end = False
 
     while not end:
