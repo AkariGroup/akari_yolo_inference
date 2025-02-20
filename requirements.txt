@@ -1,3 +1,4 @@
 akari-client[depthai]
 akari-proto
+ndjson
 tdqm
