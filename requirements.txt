@@ -1,5 +1,0 @@
-akari-client
-akari-proto
-depthai>=3.0
-ndjson
-tdqm
