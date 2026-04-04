@@ -4,11 +4,16 @@ version = "0.1.0"
 description = "AKARIでYOLOの推論を行うパッケージ"
 requires-python = ">=3.10"
 dependencies = [
-    "akari-client[depthai]",
+    "akari-client",
     "akari-proto",
     "ndjson",
+    "depthai",
     "ruff>=0.15.9",
     "tqdm",
+    "blobconverter>=1.4.3",
+    "pillow>=12.2.0",
+    "requests>=2.33.1",
+    "opencv-python>=4.13.0.92",
 ]
 
 [tool.ruff]
