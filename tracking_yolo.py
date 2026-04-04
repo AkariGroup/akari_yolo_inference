@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+
 import cv2
+
 from lib.akari_yolo_lib.oakd_tracking_yolo import OakdTrackingYolo
 
 
@@ -84,7 +86,7 @@ def main() -> None:
             show_spatial_frame=spatial_frame,
             show_orbit=orbit,
             log_path=args.log_path,
-            log_continue=args.log_continue
+            log_continue=args.log_continue,
         )
         oakd_tracking_yolo.update_bird_frame_distance(10000)
         while True:
