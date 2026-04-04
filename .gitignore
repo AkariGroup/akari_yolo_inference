@@ -11,3 +11,4 @@ build/
 dist/
 .venv
 venv/
+uv.lock

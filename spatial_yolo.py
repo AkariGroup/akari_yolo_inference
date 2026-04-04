@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+
 import cv2
+
 from lib.akari_yolo_lib.oakd_spatial_yolo import OakdSpatialYolo
 
 
