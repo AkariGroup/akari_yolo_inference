@@ -15,7 +15,7 @@ https://akarigroup.github.io/docs/source/dev/custom_object_detection/testing.htm
 ## 実行方法  
 
 ### 物体認識
-`uv run python yolo.py`
+`uv run yolo.py`
 
 引数は下記を指定可能  
 - `-m`, `--model`: オリジナルのYOLO認識モデル(.blob)を用いる場合にパスを指定。引数を指定しない場合、YOLO v7のCOCOデータセット学習モデルを用いる。  
@@ -25,7 +25,7 @@ https://akarigroup.github.io/docs/source/dev/custom_object_detection/testing.htm
 ### 3次元位置物体認識
 物体認識結果の3次元位置を推定可能。  
 
-`uv run python spatial_yolo.py`
+`uv run spatial_yolo.py`
 
 引数は下記を指定可能  
 - `-m`, `--model`: オリジナルのYOLO認識モデル(.blob)を用いる場合にパスを指定。引数を指定しない場合、YOLO v7のCOCOデータセット学習モデルを用いる。  
@@ -37,7 +37,7 @@ https://akarigroup.github.io/docs/source/dev/custom_object_detection/testing.htm
 ### 3次元位置物体トラッキング
 物体認識結果の3次元位置を推定し、トラッキングも可能。  
 
-`uv run python tracking_yolo.py`
+`uv run tracking_yolo.py`
 
 引数は下記を指定可能  
 - `-m`, `--model`: オリジナルのYOLO認識モデル(.blob)を用いる場合にパスを指定。引数を指定しない場合、YOLO v7のCOCOデータセット学習モデルを用いる。  
@@ -53,7 +53,7 @@ https://akarigroup.github.io/docs/source/dev/custom_object_detection/testing.htm
 ### 軌道ログの再生
 3次元位置物体トラッキングアプリで保存した軌道ログの再生が可能。  
 
-`uv run python orbit_player.py --log_path "ログファイルのパス"`
+`uv run orbit_player.py --log_path "ログファイルのパス"`
 
 引数は下記を指定可能  
 - `-l`, `--log_path`: ログファイルのパス。引数の指定は必須。  
